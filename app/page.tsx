@@ -1,6 +1,11 @@
 'use client'
 
+import useSWR from 'swr'
 import { useMemo, useState } from 'react'
+
+type Member = { name: string; matric: string; code: string; dept: string; level: string; time: string }
+
+const fetcher = (url: string) => fetch(url).then((response) => response.json()).then((members: Array<Member & { markedAt?: string }>) => members.map((member) => ({ ...member, time: member.markedAt ? new Date(member.markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : member.time })))
 import {
   Activity,
   ArrowRight,
@@ -74,17 +79,20 @@ function StatCard({ icon: Icon, label, value, detail, tone = 'green' }: { icon: 
 
 function AttendancePage() {
   const [code, setCode] = useState('')
-  const [present, setPresent] = useState(initialMembers)
+  const { data: storedMembers, mutate } = useSWR('/api/attendance', fetcher)
+  const present = storedMembers ?? initialMembers
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [isOpen, setIsOpen] = useState(true)
 
-  const markPresent = () => {
+  const markPresent = async () => {
     if (!isOpen) { setMessage({ type: 'error', text: 'Attendance for this meeting has been closed.' }); return }
     const member = initialMembers.find((item) => item.code === code.trim())
     if (!member) { setMessage({ type: 'error', text: 'Member not found. Please check the attendance code.' }); setCode(''); return }
-    if (present.some((item) => item.code === member.code)) { setMessage({ type: 'error', text: 'This member has already been marked present for this meeting.' }); setCode(''); return }
-    setPresent((items) => [{ ...member, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }, ...items])
-    setMessage({ type: 'success', text: `${member.name} marked present.` })
+    const response = await fetch('/api/attendance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(member) })
+    const result = await response.json()
+    if (!response.ok) { setMessage({ type: 'error', text: result.error ?? 'Unable to save attendance.' }); setCode(''); return }
+    await mutate()
+    setMessage({ type: 'success', text: `${member.name} marked present and saved.` })
     setCode('')
   }
   const rate = Math.round((present.length / 72) * 1000) / 10
