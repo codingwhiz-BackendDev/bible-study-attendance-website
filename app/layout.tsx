@@ -3,8 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'Bible Study Attendance Manager',
+  description: 'A simple and efficient system for managing Bible Study membership and attendance.',
   generator: 'v0.app',
   icons: {
     icon: [
