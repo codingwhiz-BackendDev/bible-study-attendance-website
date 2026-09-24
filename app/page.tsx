@@ -1,128 +1,22 @@
 'use client'
 
 import useSWR from 'swr'
-import { useMemo, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
+import { BookOpen, CalendarDays, Check, ClipboardCheck, Grid2X2, LayoutDashboard, LogOut, Plus, Users, X } from 'lucide-react'
 
-type Member = { name: string; matric: string; code: string; dept: string; level: string; time: string }
+type Member = { id:number; name:string; matric:string; level:string; gender:string; department:string; code:string }
+type Center = { id:number; name:string; location:string; active:boolean }
+type Meeting = { id:number; title:string; centerId:number|null; date:string; status:string }
+const fetcher = (url:string) => fetch(url).then(r => r.json())
 
-const fetcher = (url: string) => fetch(url).then((response) => response.json()).then((members: Array<Member & { markedAt?: string }>) => members.map((member) => ({ ...member, time: member.markedAt ? new Date(member.markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : member.time })))
-import {
-  Activity,
-  ArrowRight,
-  BarChart3,
-  Bell,
-  BookOpen,
-  CalendarDays,
-  Check,
-  ChevronDown,
-  ClipboardCheck,
-  Clock3,
-  Download,
-  FileText,
-  Grid2X2,
-  HelpCircle,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  MoreHorizontal,
-  Plus,
-  Search,
-  Settings,
-  ShieldCheck,
-  Sparkles,
-  Users,
-  X,
-} from 'lucide-react'
+function Login({ onLogin }:{onLogin:()=>void}) { const [password,setPassword]=useState(''); const [error,setError]=useState(''); async function submit(e:FormEvent){e.preventDefault(); const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})}); if(r.ok) onLogin(); else setError('Incorrect password.')} return <main className="login-page"><div className="login-card"><div className="brand-mark"><BookOpen size={22}/></div><p className="eyebrow">ADMINISTRATION</p><h1>Bible Study Attendance</h1><p>Sign in to manage members, centers, meetings, and attendance.</p><form onSubmit={submit}><label htmlFor="password">Admin password</label><input id="password" type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Enter password" autoFocus/>{error&&<small className="error">{error}</small>}<button className="primary-button" type="submit">Sign in</button></form><div className="public-note"><Users size={17}/><span>Teachers do not need an account. Use the public member registration page below.</span></div><button type="button" className="text-link public-link" onClick={()=>window.location.assign('/?register=1')}>Register as a Bible study member</button></div></main> }
 
-const navItems = [
-  { label: 'Dashboard', icon: LayoutDashboard },
-  { label: 'Members', icon: Users },
-  { label: 'Centers', icon: Grid2X2 },
-  { label: 'Meetings', icon: CalendarDays },
-  { label: 'Mark Attendance', icon: ClipboardCheck, active: true },
-  { label: 'Attendance History', icon: Clock3 },
-  { label: 'Statistics', icon: BarChart3 },
-  { label: 'Reports', icon: FileText },
-]
+function Members({ members, mutate, initialOpen = false }:{members:Member[];mutate:()=>void;initialOpen?:boolean}) { const [open,setOpen]=useState(initialOpen); const [form,setForm]=useState({name:'',matric:'',level:'',gender:'',department:''}); const [msg,setMsg]=useState(''); async function submit(e:FormEvent){e.preventDefault(); const r=await fetch('/api/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(form)}); const data=await r.json(); setMsg(r.ok?`Registered. Attendance code: ${data.code}`:data.error); if(r.ok){setForm({name:'',matric:'',level:'',gender:'',department:''});setOpen(false);mutate()}} return <section><div className="section-title"><div><p className="eyebrow">DIRECTORY</p><h1>Members</h1><p>Register Bible study members and give each person a unique attendance code.</p></div><button className="primary-button" onClick={()=>setOpen(!open)}><Plus size={17}/> Add member</button></div>{msg&&<div className="notice">{msg}</div>}{open&&<form className="form-card" onSubmit={submit}><div className="form-grid">{[['name','Full name'],['matric','Matric number'],['level','Level'],['gender','Gender'],['department','Department']].map(([key,label])=><label key={key}>{label}<input required value={(form as any)[key]} onChange={e=>setForm({...form,[key]:e.target.value})}/></label>)}</div><button className="primary-button">Save member</button></form>}<div className="table-card"><table><thead><tr><th>Name</th><th>Matric</th><th>Level</th><th>Gender</th><th>Department</th><th>Code</th></tr></thead><tbody>{members.map(m=><tr key={m.id}><td><strong>{m.name}</strong></td><td>{m.matric}</td><td>{m.level}</td><td>{m.gender}</td><td>{m.department}</td><td className="mono">{m.code}</td></tr>)}</tbody></table>{!members.length&&<div className="empty">No members registered yet.</div>}</div></section> }
 
-const initialMembers = [
-  { name: 'John Doe', matric: 'RUN/CMP/23/15322', code: '2315322', dept: 'Computer Science', level: '300 Level', time: '08:42 AM' },
-  { name: 'Sarah Johnson', matric: 'RUN/LAW/22/08104', code: '2208104', dept: 'Law', level: '400 Level', time: '08:40 AM' },
-  { name: 'Michael Adeyemi', matric: 'RUN/ENG/24/00418', code: '2400418', dept: 'Engineering', level: '200 Level', time: '08:37 AM' },
-  { name: 'Grace Williams', matric: 'RUN/MED/23/11920', code: '2311920', dept: 'Medicine', level: '300 Level', time: '08:31 AM' },
-]
+function Centers({centers,mutate}:{centers:Center[];mutate:()=>void}) {const [name,setName]=useState('');const [location,setLocation]=useState('');async function add(e:FormEvent){e.preventDefault();const r=await fetch('/api/centers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,location})});if(r.ok){setName('');setLocation('');mutate()}}return <section><div className="section-title"><div><p className="eyebrow">SETUP</p><h1>Centers</h1><p>Create the locations where Bible study meetings take place.</p></div></div><form className="inline-form" onSubmit={add}><input required placeholder="Center name" value={name} onChange={e=>setName(e.target.value)}/><input placeholder="Location" value={location} onChange={e=>setLocation(e.target.value)}/><button className="primary-button"><Plus size={17}/> Add center</button></form><div className="list-card">{centers.map(c=><div className="list-row" key={c.id}><div><strong>{c.name}</strong><span>{c.location||'Location not specified'}</span></div><span className="present-badge"><Check size={12}/> Active</span></div>)}{!centers.length&&<div className="empty">No centers yet. Add your first center above.</div>}</div></section> }
 
-function Logo() {
-  return <div className="brand-mark"><BookOpen size={18} strokeWidth={2.5} /></div>
-}
+function Meetings({centers,meetings,mutate}:{centers:Center[];meetings:Meeting[];mutate:()=>void}) {const [title,setTitle]=useState('');const [date,setDate]=useState('');const [centerId,setCenterId]=useState('');async function add(e:FormEvent){e.preventDefault();const r=await fetch('/api/meetings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,date,centerId:centerId||null})});if(r.ok){setTitle('');setDate('');mutate()}}return <section><div className="section-title"><div><p className="eyebrow">SCHEDULE</p><h1>Meetings</h1><p>Create a meeting before marking attendance.</p></div></div><form className="inline-form" onSubmit={add}><input required placeholder="Meeting title" value={title} onChange={e=>setTitle(e.target.value)}/><input required type="date" value={date} onChange={e=>setDate(e.target.value)}/><select value={centerId} onChange={e=>setCenterId(e.target.value)}><option value="">Choose center</option>{centers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><button className="primary-button"><Plus size={17}/> Create meeting</button></form><div className="list-card">{meetings.map(m=><div className="list-row" key={m.id}><div><strong>{m.title}</strong><span>{m.date} · {centers.find(c=>c.id===m.centerId)?.name||'No center'}</span></div><span className="status-badge"><span/> {m.status}</span></div>)}{!meetings.length&&<div className="empty">No meetings created yet.</div>}</div></section> }
 
-function Sidebar({ onClose, onNavigate }: { onClose?: () => void; onNavigate?: (label: string) => void }) {
-  return <aside className="sidebar">
-    <div className="sidebar-top">
-      <div className="brand"><Logo /><div><strong>Bible Study</strong><span>Attendance Manager</span></div></div>
-      {onClose && <button className="icon-button mobile-close" onClick={onClose} aria-label="Close menu"><X size={18} /></button>}
-    </div>
-    <div className="church-switcher"><div className="church-avatar">R</div><div><strong>Redeemer&apos;s University</strong><span>Bible Study Department</span></div><ChevronDown size={15} /></div>
-    <nav className="nav-list" aria-label="Main navigation">
-      <p className="nav-label">Workspace</p>
-      {navItems.map(({ label, icon: Icon, active }) => <button className={`nav-item ${active ? 'active' : ''}`} key={label} onClick={() => onNavigate?.(label)}><Icon size={17} /><span>{label}</span>{label === 'Mark Attendance' && <span className="nav-pulse" />}</button>)}
-      <p className="nav-label settings-label">Manage</p>
-      <button className="nav-item" onClick={() => onNavigate?.('Settings')}><Settings size={17} /><span>Settings</span></button>
-    </nav>
-    <div className="sidebar-bottom"><div className="help-card"><div className="help-icon"><HelpCircle size={16} /></div><div><strong>Need help?</strong><span>View quick guide</span></div><ArrowRight size={15} /></div><div className="user-row"><div className="user-avatar">AD</div><div><strong>Admin</strong><span>Administrator</span></div><MoreHorizontal size={18} /></div></div>
-  </aside>
-}
+function Attendance({members}:{members:Member[]}) {const [code,setCode]=useState('');const [message,setMessage]=useState('');const [present,setPresent]=useState<Member[]>([]);async function mark(){const member=members.find(m=>m.code===code.trim());if(!member){setMessage('Member not found. Use the code from the Members page.');return}const r=await fetch('/api/attendance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(member)});const data=await r.json();setMessage(r.ok?`${member.name} marked present.`:data.error);if(r.ok){setPresent(p=>[member,...p]);setCode('')}}return <section><div className="section-title"><div><p className="eyebrow">LIVE SESSION</p><h1>Mark Attendance</h1><p>Enter a registered member&apos;s seven-digit code.</p></div></div><div className="scan-card"><div className="code-entry"><input inputMode="numeric" placeholder="Attendance code" value={code} onChange={e=>setCode(e.target.value.replace(/\\D/g,''))} onKeyDown={e=>e.key==='Enter'&&mark()}/><button className="primary-button" onClick={mark}><ClipboardCheck size={17}/> Mark present</button></div>{message&&<div className="notice">{message}</div>}</div><div className="table-card"><h2>Marked in this session ({present.length})</h2>{present.map(m=><div className="list-row" key={m.code}><div><strong>{m.name}</strong><span>{m.matric} · {m.department}</span></div><span className="present-badge"><Check size={12}/> Present</span></div>)}{!present.length&&<div className="empty">No attendance marked in this session.</div>}</div></section> }
 
-function StatCard({ icon: Icon, label, value, detail, tone = 'green' }: { icon: typeof Users; label: string; value: string; detail: string; tone?: string }) {
-  return <div className="stat-card"><div className={`stat-icon ${tone}`}><Icon size={18} /></div><div className="stat-copy"><span>{label}</span><strong>{value}</strong><small><b>{detail.split(' ')[0]}</b> {detail.split(' ').slice(1).join(' ')}</small></div></div>
-}
-
-function AttendancePage() {
-  const [code, setCode] = useState('')
-  const { data: storedMembers, mutate } = useSWR('/api/attendance', fetcher)
-  const present = storedMembers ?? initialMembers
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [isOpen, setIsOpen] = useState(true)
-
-  const markPresent = async () => {
-    if (!isOpen) { setMessage({ type: 'error', text: 'Attendance for this meeting has been closed.' }); return }
-    const member = initialMembers.find((item) => item.code === code.trim())
-    if (!member) { setMessage({ type: 'error', text: 'Member not found. Please check the attendance code.' }); setCode(''); return }
-    const response = await fetch('/api/attendance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(member) })
-    const result = await response.json()
-    if (!response.ok) { setMessage({ type: 'error', text: result.error ?? 'Unable to save attendance.' }); setCode(''); return }
-    await mutate()
-    setMessage({ type: 'success', text: `${member.name} marked present and saved.` })
-    setCode('')
-  }
-  const rate = Math.round((present.length / 72) * 1000) / 10
-  return <>
-    <div className="page-heading"><div><p className="eyebrow">LIVE SESSION</p><h1>Mark Attendance</h1><p>Record attendance quickly using each member&apos;s unique code.</p></div><div className="heading-actions"><button className="outline-button"><Download size={16} /> Export list</button><button className="ghost-button"><MoreHorizontal size={19} /></button></div></div>
-    <div className="meeting-banner"><div className="meeting-icon"><CalendarDays size={21} /></div><div className="meeting-details"><div><strong>Sunday Bible Study</strong><span className="status-badge"><span /> Open</span></div><p>Center: <b>Faith Center</b><span className="dot-separator">·</span> Sunday, September 20, 2026</p></div><div className="live-time"><span>Current time</span><strong>08:45:12 AM</strong></div><button className="close-session" onClick={() => setIsOpen(!isOpen)}>{isOpen ? 'Close session' : 'Re-open session'}</button></div>
-    <div className="attendance-layout">
-      <div className="attendance-main"><div className="scan-card"><div className="scan-top"><div><p className="eyebrow">QUICK ENTRY</p><h2>Enter attendance code</h2><p>Press Enter or tap the button to mark a member present.</p></div><div className="scan-badge"><ShieldCheck size={16} /> Fast & secure</div></div><div className="code-entry"><div className="code-input-wrap"><Search size={20} /><input autoFocus inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) markPresent() }} placeholder="e.g. 2315322" aria-label="Enter attendance code" /></div><button className="primary-button" onClick={markPresent}><Check size={18} /> Mark present</button></div>{message && <div className={`feedback ${message.type}`}><div className="feedback-icon">{message.type === 'success' ? <Check size={15} /> : <X size={15} />}</div><span>{message.text}</span><button onClick={() => setMessage(null)} aria-label="Dismiss message"><X size={14} /></button></div>}<div className="tip"><Sparkles size={15} /><span>Tip: Keep this page open and use Enter to process the next member quickly.</span></div></div>
-        <div className="present-card"><div className="section-header"><div><h2>Present today</h2><p>Members marked present in this session</p></div><div className="present-count"><strong>{present.length}</strong><span>of 72 members</span></div></div><div className="progress-wrap"><div className="progress-track"><div className="progress-fill" style={{ width: `${rate}%` }} /></div><strong>{rate}%</strong><span>attendance rate</span></div><div className="table-wrap"><table><thead><tr><th>#</th><th>Member</th><th>Matric number</th><th>Department</th><th>Time marked</th><th>Status</th></tr></thead><tbody>{present.map((member, index) => <tr key={member.code}><td className="muted-cell">{String(index + 1).padStart(2, '0')}</td><td><div className="member-cell"><div className="mini-avatar">{member.name.split(' ').map((n) => n[0]).join('')}</div><strong>{member.name}</strong></div></td><td className="mono">{member.matric}</td><td>{member.dept}</td><td>{member.time}</td><td><span className="present-badge"><Check size={12} /> Present</span></td></tr>)}</tbody></table></div></div>
-      </div>
-      <aside className="attendance-side"><div className="side-card"><div className="side-card-heading"><h3>Session overview</h3><MoreHorizontal size={17} /></div><div className="circle-chart"><div><strong>{rate}%</strong><span>attendance</span></div></div><div className="side-stat-row"><span><i className="dot present-dot" /> Present</span><strong>{present.length}</strong></div><div className="side-stat-row"><span><i className="dot absent-dot" /> Remaining</span><strong>{72 - present.length}</strong></div><div className="side-divider" /><div className="side-stat-row total"><span>Total members</span><strong>72</strong></div></div><div className="side-card activity-card"><div className="side-card-heading"><h3>Recent activity</h3><button>View all</button></div>{present.slice(0, 3).map((member) => <div className="activity-row" key={member.code}><div className="mini-avatar">{member.name.split(' ').map((n) => n[0]).join('')}</div><div><strong>{member.name}</strong><span>Marked present · {member.time}</span></div></div>)}</div></aside>
-    </div>
-  </>
-}
-
-function GenericPage({ title }: { title: string }) {
-  return <div className="empty-page"><p className="eyebrow">WORKSPACE</p><h1>{title}</h1><p>This section is ready for your {title.toLowerCase()} workflow.</p><div className="empty-page-card"><ClipboardCheck size={22} /><div><strong>{title} is connected</strong><span>Use the navigation to move between working areas. Attendance records are saved to Neon.</span></div></div></div>
-}
-
-function DashboardHome({ onNavigate }: { onNavigate: (label: string) => void }) {
-  return <><div className="page-heading"><div><p className="eyebrow">SUNDAY, SEPTEMBER 20, 2026</p><h1>Good morning, Admin</h1><p>Here&apos;s what&apos;s happening with your Bible Study community.</p></div><div className="heading-actions"><button className="outline-button" onClick={() => onNavigate('Reports')}><Download size={16} /> Export report</button><button className="primary-button" onClick={() => onNavigate('Meetings')}><Plus size={17} /> Create meeting</button></div></div><div className="stats-grid"><StatCard icon={Users} label="Total members" value="248" detail="12 this month" /><StatCard icon={ClipboardCheck} label="Overall attendance" value="82.4%" detail="4.8% vs last month" tone="blue" /><StatCard icon={CalendarDays} label="Meetings this month" value="8" detail="2 upcoming" tone="purple" /><StatCard icon={Activity} label="Active centers" value="3" detail="All centers active" tone="orange" /></div><div className="dashboard-grid"><div className="chart-card"><div className="section-header"><div><h2>Attendance overview</h2><p>Attendance trends across all meetings</p></div><button className="filter-button">Last 6 months <ChevronDown size={14} /></button></div><div className="fake-chart"><div className="chart-y"><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span></div><div className="chart-area"><div className="grid-lines" /> <svg viewBox="0 0 700 220" preserveAspectRatio="none" aria-label="Attendance trend chart"><defs><linearGradient id="area" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#0d8c66" stopOpacity=".2" /><stop offset="100%" stopColor="#0d8c66" stopOpacity="0" /></linearGradient></defs><path d="M0,160 C45,145 65,170 110,130 S175,105 220,126 S275,72 330,98 S390,92 440,68 S500,105 550,65 S625,42 700,45 L700,220 L0,220Z" fill="url(#area)" /><path d="M0,160 C45,145 65,170 110,130 S175,105 220,126 S275,72 330,98 S390,92 440,68 S500,105 550,65 S625,42 700,45" fill="none" stroke="#0d8c66" strokeWidth="3" /></svg><div className="chart-x"><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span></div></div></div></div><div className="recent-card"><div className="section-header"><div><h2>Recent activity</h2><p>Latest updates from your department</p></div><button className="text-button">View all <ArrowRight size={14} /></button></div><div className="activity-list"><div className="activity-item"><div className="activity-circle green-bg"><Check size={15} /></div><div><strong>John Doe was marked present</strong><span>Sunday Bible Study · Faith Center</span></div><time>2m ago</time></div><div className="activity-item"><div className="activity-circle blue-bg"><Users size={15} /></div><div><strong>New member registered</strong><span>Grace Williams · Medicine</span></div><time>1h ago</time></div><div className="activity-item"><div className="activity-circle purple-bg"><CalendarDays size={15} /></div><div><strong>Meeting session created</strong><span>Weekly Bible Study · Sep 23</span></div><time>3h ago</time></div></div></div></div></>
-}
-
-export default function Page() {
-  const [mobileNav, setMobileNav] = useState(false)
-  const [activePage, setActivePage] = useState('Dashboard')
-  const page = useMemo(() => {
-    if (activePage === 'Dashboard') return <DashboardHome onNavigate={setActivePage} />
-    if (activePage === 'Mark Attendance') return <AttendancePage />
-    return <GenericPage title={activePage} />
-  }, [activePage])
-  return <div className="app-shell"><div className={`mobile-overlay ${mobileNav ? 'show' : ''}`} onClick={() => setMobileNav(false)} /><div className={`sidebar-wrap ${mobileNav ? 'open' : ''}`}><Sidebar onClose={() => setMobileNav(false)} onNavigate={(label) => { setActivePage(label); setMobileNav(false) }} /></div><main className="main-content"><header className="topbar"><button className="mobile-menu icon-button" onClick={() => setMobileNav(true)} aria-label="Open menu"><Menu size={20} /></button><div className="breadcrumb"><span>Workspace</span><ArrowRight size={14} /><strong>{activePage}</strong></div><div className="topbar-actions"><button className="icon-button notification" aria-label="Notifications"><Bell size={18} /><i /></button><div className="topbar-avatar">AD</div></div></header><div className="content-wrap"><div className="page-tabs">{['Dashboard', 'Mark Attendance'].map((item) => <button key={item} className={activePage === item ? 'selected' : ''} onClick={() => setActivePage(item)}>{item}</button>)}</div>{page}</div></main></div>
-}
+export default function Page(){const [auth,setAuth]=useState<boolean|null>(null);const [publicRegister,setPublicRegister]=useState(false);const [view,setView]=useState('Dashboard');const members=useSWR<Member[]>('/api/members',fetcher);const centers=useSWR<Center[]>('/api/centers',fetcher);const meetings=useSWR<Meeting[]>('/api/meetings',fetcher);useEffect(()=>{fetch('/api/auth').then(r=>r.json()).then(d=>setAuth(d.authenticated));setPublicRegister(new URLSearchParams(window.location.search).has('register'))},[]);if(auth===null)return <div className="loading">Loading…</div>;if(publicRegister&&!auth)return <main className="content-wrap"><Members members={members.data??[]} mutate={()=>members.mutate()} initialOpen/><button className="text-link public-link" onClick={()=>{window.history.replaceState({},'', '/');setPublicRegister(false)}}>Back to admin sign in</button></main>;if(!auth)return <Login onLogin={()=>setAuth(true)}/>;const items=[['Dashboard',LayoutDashboard],['Members',Users],['Centers',Grid2X2],['Meetings',CalendarDays],['Mark Attendance',ClipboardCheck]] as const;return <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand-mark"><BookOpen size={18}/></div><div><strong>Bible Study</strong><span>Attendance Manager</span></div></div><nav>{items.map(([label,Icon])=><button className={view===label?'active':''} key={label} onClick={()=>setView(label)}><Icon size={17}/>{label}</button>)}</nav><button className="logout" onClick={async()=>{await fetch('/api/auth',{method:'DELETE'});setAuth(false)}}><LogOut size={16}/> Sign out</button></aside><main className="main-content"><header className="topbar"><span>Workspace / <strong>{view}</strong></span><span className="user-pill">Admin</span></header><div className="content-wrap">{view==='Dashboard'&&<section><div className="section-title"><div><p className="eyebrow">ADMIN CONSOLE</p><h1>Good morning, Admin</h1><p>Set up your Bible study workflow, then register members and take attendance.</p></div></div><div className="stats-grid"><div className="stat-card"><strong>{members.data?.length??0}</strong><span>Registered members</span></div><div className="stat-card"><strong>{centers.data?.length??0}</strong><span>Centers</span></div><div className="stat-card"><strong>{meetings.data?.length??0}</strong><span>Meetings</span></div></div><div className="notice">Start here: add a center, create a meeting, register members, then open Mark Attendance. No dummy data is used.</div></section>}{view==='Members'&&<Members members={members.data??[]} mutate={()=>members.mutate()}/>} {view==='Centers'&&<Centers centers={centers.data??[]} mutate={()=>centers.mutate()}/>} {view==='Meetings'&&<Meetings centers={centers.data??[]} meetings={meetings.data??[]} mutate={()=>meetings.mutate()}/>} {view==='Mark Attendance'&&<Attendance members={members.data??[]}/>}</div></main></div>}
