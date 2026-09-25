@@ -10,7 +10,7 @@ function normalizeMatric(value: unknown) {
   const raw = String(value ?? '').trim().toUpperCase()
   if (!raw) return ''
   if (/^\d+$/.test(raw)) return `${MATRIC_PREFIX}${raw}`
-  return raw.replace(/\\s+/g, '')
+  return raw.replace(/\s+/g, '')
 }
 
 export async function GET() {

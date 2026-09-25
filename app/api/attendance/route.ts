@@ -33,7 +33,11 @@ export async function POST(request: Request) {
   if (!meeting.rowCount) return NextResponse.json({ error: 'That meeting was not found.' }, { status: 404 })
   const session = meeting.rows[0]
   if (session.meeting_type === 'center' && new Date(`${session.meeting_date.toISOString().slice(0, 10)}T12:00:00`).getDay() !== 0) return NextResponse.json({ error: 'Center attendance can only be marked for Sunday sessions.' }, { status: 400 })
-  const member = await pool.query('SELECT name, matric_number AS matric, department, level, attendance_code AS code FROM members WHERE LOWER(matric_number) = LOWER($1)', [matric])
+  const member = await pool.query(`SELECT name, matric_number AS matric, department, level, attendance_code AS code
+    FROM members
+    WHERE LOWER(matric_number) = LOWER($1)
+       OR regexp_replace(matric_number, '[^0-9]+', '', 'g') = regexp_replace($1, '[^0-9]+', '', 'g')
+    LIMIT 1`, [matric])
   if (!member.rowCount) return NextResponse.json({ error: 'No registered member has that matric number.' }, { status: 404 })
   const m = member.rows[0]
   const result = await pool.query(`INSERT INTO attendance_records (member_code, member_name, matric_number, department, level, meeting_name, center_name) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (member_code, meeting_name) DO NOTHING RETURNING id, member_name AS name, matric_number AS matric, department AS dept, level, marked_at AS "markedAt"`, [m.code, m.name, m.matric, m.department, m.level, session.title, session.center_name || 'Weekly meeting'])
