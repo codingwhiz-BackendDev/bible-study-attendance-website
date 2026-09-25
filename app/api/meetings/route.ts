@@ -4,6 +4,33 @@ import { requireAdminResponse } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 
+const NIGERIA_TIME_ZONE = 'Africa/Lagos'
+const SUNDAY_MORNING_START = 6
+const SUNDAY_MORNING_END = 12
+
+function getNigeriaDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: NIGERIA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short',
+    hour: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]))
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    weekday: values.weekday,
+    hour: Number(values.hour),
+  }
+}
+
+function isSundayMorningInNigeria() {
+  const now = getNigeriaDateParts()
+  return now.weekday === 'Sun' && now.hour >= SUNDAY_MORNING_START && now.hour < SUNDAY_MORNING_END
+}
+
 export async function GET() {
   const denied = await requireAdminResponse()
   if (denied) return denied
@@ -21,7 +48,12 @@ export async function POST(request: Request) {
   const centerId = body.centerId ? Number(body.centerId) : null
   if (!title || !date) return NextResponse.json({ error: 'Title and date are required.' }, { status: 400 })
   if (meetingType === 'center' && !centerId) return NextResponse.json({ error: 'Choose a center for Sunday attendance.' }, { status: 400 })
-  if (meetingType === 'center' && new Date(`${date}T12:00:00`).getDay() !== 0) return NextResponse.json({ error: 'Center attendance is only available on Sundays.' }, { status: 400 })
+  if (meetingType === 'center') {
+    const nigeriaNow = getNigeriaDateParts()
+    if (!isSundayMorningInNigeria() || date !== nigeriaNow.date) {
+      return NextResponse.json({ error: 'Sunday center attendance can only be created on the current Sunday between 6:00 AM and 12:00 PM Nigeria time.' }, { status: 400 })
+    }
+  }
   if (meetingType === 'weekly' && centerId) return NextResponse.json({ error: 'Weekly meetings are not attached to a center.' }, { status: 400 })
   const result = await pool.query(`INSERT INTO meetings (title, meeting_date, center_id, meeting_type) VALUES ($1,$2,$3,$4) RETURNING id, title, center_id AS "centerId", meeting_date AS date, meeting_type AS "meetingType", status`, [title, date, meetingType === 'center' ? centerId : null, meetingType])
   return NextResponse.json(result.rows[0], { status: 201 })
