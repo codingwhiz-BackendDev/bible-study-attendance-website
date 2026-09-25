@@ -59,6 +59,15 @@ export async function POST(request: Request) {
   return NextResponse.json(result.rows[0], { status: 201 })
 }
 
+export async function DELETE(request: Request) {
+  const denied = await requireAdminResponse()
+  if (denied) return denied
+  const id = Number(new URL(request.url).searchParams.get('id'))
+  if (!id) return NextResponse.json({ error: 'Meeting id is required.' }, { status: 400 })
+  const result = await pool.query('DELETE FROM meetings WHERE id = $1 RETURNING id', [id])
+  return result.rowCount ? NextResponse.json({ ok: true }) : NextResponse.json({ error: 'Meeting not found.' }, { status: 404 })
+}
+
 export async function PATCH(request: Request) {
   const denied = await requireAdminResponse()
   if (denied) return denied
