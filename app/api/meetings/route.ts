@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
+import { requireAdminResponse } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 
 export async function GET() {
+  const denied = await requireAdminResponse()
+  if (denied) return denied
   const result = await pool.query(`SELECT id, title, center_id AS "centerId", meeting_date AS date, meeting_type AS "meetingType", status FROM meetings ORDER BY meeting_date DESC`)
   return NextResponse.json(result.rows)
 }
 
 export async function POST(request: Request) {
+  const denied = await requireAdminResponse()
+  if (denied) return denied
   const body = await request.json()
   const title = String(body.title ?? '').trim()
   const date = String(body.date ?? '').trim()
@@ -23,6 +28,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const denied = await requireAdminResponse()
+  if (denied) return denied
   const body = await request.json()
   const id = Number(body.id)
   const title = String(body.title ?? '').trim()

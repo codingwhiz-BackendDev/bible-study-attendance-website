@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
+import { requireAdminResponse } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 
 export async function GET() {
+  const denied = await requireAdminResponse()
+  if (denied) return denied
   const result = await pool.query('SELECT id, name, matric_number AS matric, level, gender, department, attendance_code AS code FROM members ORDER BY name')
   return NextResponse.json(result.rows)
 }
 
 export async function POST(request: Request) {
+  const denied = await requireAdminResponse()
+  if (denied) return denied
   const body = await request.json()
   const name = String(body.name ?? '').trim(); const matric = String(body.matric ?? '').trim(); const level = String(body.level ?? '').trim(); const gender = String(body.gender ?? '').trim(); const department = String(body.department ?? '').trim()
   if (!name || !matric || !level || !gender || !department) return NextResponse.json({ error: 'Complete every field.' }, { status: 400 })

@@ -1,6 +1,5 @@
-import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 import { pool } from '@/lib/db'
+import { requireAdminResponse } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 
@@ -9,37 +8,12 @@ function csvCell(value: unknown) {
 }
 
 export async function GET(request: Request) {
-  const isAdmin = (await cookies()).get('bible_admin')?.value === 'authenticated'
-  if (!isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+  const denied = await requireAdminResponse()
+  if (denied) return denied
   const meetingId = Number(new URL(request.url).searchParams.get('meetingId'))
-  if (!Number.isInteger(meetingId) || meetingId < 1) return NextResponse.json({ error: 'A valid meeting is required.' }, { status: 400 })
-
-  const result = await pool.query(`
-    SELECT m.title, m.meeting_date, m.meeting_type, c.name AS center_name,
-           a.member_name, a.matric_number, a.department, a.level, a.marked_at
-    FROM meetings m
-    LEFT JOIN centers c ON c.id = m.center_id
-    LEFT JOIN attendance_records a ON a.meeting_name = m.title
-    WHERE m.id = $1
-    ORDER BY a.member_name NULLS LAST
-  `, [meetingId])
-  if (!result.rowCount) return NextResponse.json({ error: 'Meeting not found.' }, { status: 404 })
-
-  const first = result.rows[0]
-  const lines = [
-    ['Meeting', 'Date', 'Type', 'Center', 'Member name', 'Matric number', 'Department', 'Level', 'Marked at'],
-    ...result.rows.map(row => [row.title, row.meeting_date.toISOString().slice(0, 10), row.meeting_type === 'center' ? 'Sunday center attendance' : 'Weekly meeting', row.center_name || 'Independent weekly meeting', row.member_name || '', row.matric_number || '', row.department || '', row.level || '', row.marked_at ? new Date(row.marked_at).toISOString() : ''])
-  ].map(row => row.map(csvCell).join(','))
-
-  const filename = `${String(first.title).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'attendance'}-${new Date(first.meeting_date).toISOString().slice(0, 10)}.csv`
-  return new NextResponse(`\ufeff${lines.join('\r\n')}`, {
-    headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Cache-Control': 'no-store'
-    }
-  })
+  if (!meetingId) return Response.json({ error: 'Meeting is required.' }, { status: 400 })
+  const result = await pool.query(`SELECT m.title, m.meeting_date AS date, COALESCE(c.name, 'Weekly meeting') AS center_name, a.member_name AS name, a.matric_number AS matric, a.level, a.department, a.marked_at AS marked_at FROM attendance_records a JOIN meetings m ON m.title = a.meeting_name LEFT JOIN centers c ON c.name = a.center_name WHERE m.id = $1 ORDER BY a.member_name`, [meetingId])
+  const rows = ['Meeting,Date,Center,Member name,Matric number,Level,Department,Marked at']
+  for (const row of result.rows) rows.push([row.title, row.date, row.center_name, row.name, row.matric, row.level, row.department, row.marked_at].map(csvCell).join(','))
+  return new Response(`\uFEFF${rows.join('\r\n')}`, { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="attendance-${meetingId}.csv"`, 'Cache-Control': 'no-store' } })
 }
-
-export async function OPTIONS() { return new NextResponse(null, { status: 204 }) }

@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
+import { requireAdminResponse } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
+  const denied = await requireAdminResponse()
+  if (denied) return denied
   const meetingId = Number(new URL(request.url).searchParams.get('meetingId'))
   if (!meetingId) return NextResponse.json([])
   const result = await pool.query(`SELECT a.id, a.member_name AS name, a.matric_number AS matric, a.department AS dept, a.level, a.marked_at AS "markedAt" FROM attendance_records a JOIN meetings m ON m.title = a.meeting_name WHERE m.id = $1 ORDER BY a.marked_at DESC`, [meetingId])
@@ -11,6 +14,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const denied = await requireAdminResponse()
+  if (denied) return denied
   const body = await request.json()
   const matric = String(body.matric ?? '').trim()
   const meetingId = Number(body.meetingId)
