@@ -1,32 +1,25 @@
 import { NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
-
 export const runtime = 'nodejs'
 
-const meetingName = 'Sunday Bible Study'
-
-export async function GET() {
-  const result = await pool.query(
-    `SELECT id, member_code AS code, member_name AS name, matric_number AS matric, department AS dept, level, marked_at AS "markedAt"
-     FROM attendance_records WHERE meeting_name = $1 ORDER BY marked_at DESC`,
-    [meetingName],
-  )
+export async function GET(request: Request) {
+  const meetingId = Number(new URL(request.url).searchParams.get('meetingId'))
+  if (!meetingId) return NextResponse.json([])
+  const result = await pool.query(`SELECT a.id, a.member_name AS name, a.matric_number AS matric, a.department AS dept, a.level, a.marked_at AS "markedAt" FROM attendance_records a JOIN meetings m ON m.title = a.meeting_name WHERE m.id = $1 ORDER BY a.marked_at DESC`, [meetingId])
   return NextResponse.json(result.rows)
 }
 
 export async function POST(request: Request) {
   const body = await request.json()
-  const code = typeof body.code === 'string' ? body.code.trim() : ''
-  if (!/^\d{7}$/.test(code)) return NextResponse.json({ error: 'Enter a valid seven-digit attendance code.' }, { status: 400 })
-
-  const result = await pool.query(
-    `INSERT INTO attendance_records (member_code, member_name, matric_number, department, level, meeting_name)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     ON CONFLICT (member_code, meeting_name) DO NOTHING
-     RETURNING id, member_code AS code, member_name AS name, matric_number AS matric, department AS dept, level, marked_at AS "markedAt"`,
-    [code, body.name ?? 'Member', body.matric ?? `RUN/GEN/${code}`, body.dept ?? 'General', body.level ?? 'Member', meetingName],
-  )
-
-  if (result.rowCount === 0) return NextResponse.json({ error: 'This member has already been marked present.' }, { status: 409 })
+  const matric = String(body.matric ?? '').trim()
+  const meetingId = Number(body.meetingId)
+  if (!matric || !meetingId) return NextResponse.json({ error: 'Select a meeting and enter a matric number.' }, { status: 400 })
+  const meeting = await pool.query('SELECT m.title, c.name AS center_name FROM meetings m JOIN centers c ON c.id = m.center_id WHERE m.id = $1', [meetingId])
+  if (!meeting.rowCount) return NextResponse.json({ error: 'That meeting was not found.' }, { status: 404 })
+  const member = await pool.query('SELECT name, matric_number AS matric, department, level, attendance_code AS code FROM members WHERE LOWER(matric_number) = LOWER($1)', [matric])
+  if (!member.rowCount) return NextResponse.json({ error: 'No registered member has that matric number.' }, { status: 404 })
+  const m = member.rows[0]; const session = meeting.rows[0]
+  const result = await pool.query(`INSERT INTO attendance_records (member_code, member_name, matric_number, department, level, meeting_name, center_name) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (member_code, meeting_name) DO NOTHING RETURNING id, member_name AS name, matric_number AS matric, department AS dept, level, marked_at AS "markedAt"`, [m.code, m.name, m.matric, m.department, m.level, session.title, session.center_name])
+  if (!result.rowCount) return NextResponse.json({ error: 'This member is already marked present for this meeting.' }, { status: 409 })
   return NextResponse.json(result.rows[0], { status: 201 })
 }
