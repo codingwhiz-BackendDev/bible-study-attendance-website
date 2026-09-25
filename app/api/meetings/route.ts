@@ -34,7 +34,7 @@ function isSundayMorningInNigeria() {
 export async function GET() {
   const denied = await requireAdminResponse()
   if (denied) return denied
-  const result = await pool.query(`SELECT id, title, center_id AS "centerId", meeting_date AS date, meeting_type AS "meetingType", status FROM meetings ORDER BY meeting_date DESC`)
+  const result = await pool.query(`SELECT id, title, center_id AS "centerId", to_char(meeting_date, 'YYYY-MM-DD') AS date, meeting_type AS "meetingType", status FROM meetings ORDER BY meeting_date DESC`)
   return NextResponse.json(result.rows)
 }
 
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     }
   }
   if (meetingType === 'weekly' && centerId) return NextResponse.json({ error: 'Weekly meetings are not attached to a center.' }, { status: 400 })
-  const result = await pool.query(`INSERT INTO meetings (title, meeting_date, center_id, meeting_type) VALUES ($1,$2,$3,$4) RETURNING id, title, center_id AS "centerId", meeting_date AS date, meeting_type AS "meetingType", status`, [title, date, meetingType === 'center' ? centerId : null, meetingType])
+  const result = await pool.query(`INSERT INTO meetings (title, meeting_date, center_id, meeting_type) VALUES ($1,$2,$3,$4) RETURNING id, title, center_id AS "centerId", to_char(meeting_date, 'YYYY-MM-DD') AS date, meeting_type AS "meetingType", status`, [title, date, meetingType === 'center' ? centerId : null, meetingType])
   return NextResponse.json(result.rows[0], { status: 201 })
 }
 
@@ -75,6 +75,6 @@ export async function PATCH(request: Request) {
   const id = Number(body.id)
   const title = String(body.title ?? '').trim()
   if (!id || !title) return NextResponse.json({ error: 'Meeting title is required.' }, { status: 400 })
-  const result = await pool.query(`UPDATE meetings SET title = $1 WHERE id = $2 RETURNING id, title, center_id AS "centerId", meeting_date AS date, meeting_type AS "meetingType", status`, [title, id])
+  const result = await pool.query(`UPDATE meetings SET title = $1 WHERE id = $2 RETURNING id, title, center_id AS "centerId", to_char(meeting_date, 'YYYY-MM-DD') AS date, meeting_type AS "meetingType", status`, [title, id])
   return NextResponse.json(result.rows[0])
 }
