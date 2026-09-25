@@ -4,6 +4,15 @@ import { requireAdminResponse } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 
+const MATRIC_PREFIX = 'RUN/CMP/23/'
+
+function normalizeMatric(value: unknown) {
+  const raw = String(value ?? '').trim().toUpperCase()
+  if (!raw) return ''
+  if (/^\d+$/.test(raw)) return `${MATRIC_PREFIX}${raw}`
+  return raw.replace(/\s+/g, '')
+}
+
 export async function GET(request: Request) {
   const denied = await requireAdminResponse()
   if (denied) return denied
@@ -17,7 +26,7 @@ export async function POST(request: Request) {
   const denied = await requireAdminResponse()
   if (denied) return denied
   const body = await request.json()
-  const matric = String(body.matric ?? '').trim()
+  const matric = normalizeMatric(body.matric)
   const meetingId = Number(body.meetingId)
   if (!matric || !meetingId) return NextResponse.json({ error: 'Select a meeting and enter a matric number.' }, { status: 400 })
   const meeting = await pool.query(`SELECT m.title, m.meeting_type, m.meeting_date, c.name AS center_name FROM meetings m LEFT JOIN centers c ON c.id = m.center_id WHERE m.id = $1`, [meetingId])
