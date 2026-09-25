@@ -50,8 +50,8 @@ export async function DELETE(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const denied = await requireAdminResponse()
-  if (denied) return denied
+  // Public member self-registration is intentionally available from the login page.
+  // Admin-only operations remain protected by requireAdminResponse.
   const body = await request.json()
   const name = String(body.name ?? '').trim(); const matric = normalizeMatric(body.matric); const level = String(body.level ?? '').trim(); const gender = String(body.gender ?? '').trim(); const department = String(body.department ?? '').trim()
   if (!name || !matric || !level || !gender || !department) return NextResponse.json({ error: 'Complete every field.' }, { status: 400 })
