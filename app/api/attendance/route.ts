@@ -35,8 +35,8 @@ export async function POST(request: Request) {
   if (session.meeting_type === 'center' && new Date(`${session.meeting_date.toISOString().slice(0, 10)}T12:00:00`).getDay() !== 0) return NextResponse.json({ error: 'Center attendance can only be marked for Sunday sessions.' }, { status: 400 })
   const member = await pool.query(`SELECT name, matric_number AS matric, department, level, attendance_code AS code
     FROM members
-    WHERE LOWER(matric_number) = LOWER($1)
-       OR regexp_replace(matric_number, '[^0-9]+', '', 'g') = regexp_replace($1, '[^0-9]+', '', 'g')
+    WHERE UPPER(regexp_replace(matric_number, '\\s+', '', 'g')) = UPPER($1)
+       OR RIGHT(regexp_replace(matric_number, '[^0-9]', '', 'g'), LENGTH(regexp_replace($1, '[^0-9]', '', 'g'))) = regexp_replace($1, '[^0-9]', '', 'g')
     LIMIT 1`, [matric])
   if (!member.rowCount) return NextResponse.json({ error: 'No registered member has that matric number.' }, { status: 404 })
   const m = member.rows[0]
