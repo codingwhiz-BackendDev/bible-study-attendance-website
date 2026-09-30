@@ -32,8 +32,6 @@ function isSundayMorningInNigeria() {
 }
 
 export async function GET() {
-  const denied = await requireAdminResponse()
-  if (denied) return denied
   const result = await pool.query(`SELECT id, title, center_id AS "centerId", to_char(meeting_date, 'YYYY-MM-DD') AS date, meeting_type AS "meetingType", status FROM meetings ORDER BY meeting_date DESC`)
   return NextResponse.json(result.rows)
 }

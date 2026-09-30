@@ -16,7 +16,7 @@ function normalizeMatric(value: unknown) {
 export async function GET() {
   const denied = await requireAdminResponse()
   if (denied) return denied
-  const result = await pool.query('SELECT id, name, matric_number AS matric, level, gender, department, attendance_code AS code FROM members ORDER BY name')
+  const result = await pool.query('SELECT m.id, m.name, m.matric_number AS matric, m.level, m.gender, m.department, m.center_id AS "centerId", c.name AS "centerName", m.attendance_code AS code FROM members m LEFT JOIN centers c ON c.id = m.center_id ORDER BY m.name')
   return NextResponse.json(result.rows)
 }
 
@@ -30,9 +30,10 @@ export async function PATCH(request: Request) {
   const level = String(body.level ?? '').trim()
   const gender = String(body.gender ?? '').trim()
   const department = String(body.department ?? '').trim()
+  const centerId = body.centerId ? Number(body.centerId) : null
   if (!id || !name || !matric || !level || !gender || !department) return NextResponse.json({ error: 'Complete every field.' }, { status: 400 })
   try {
-    const result = await pool.query('UPDATE members SET name=$1, matric_number=$2, level=$3, gender=$4, department=$5 WHERE id=$6 RETURNING id, name, matric_number AS matric, level, gender, department, attendance_code AS code', [name, matric, level, gender, department, id])
+    const result = await pool.query('UPDATE members SET name=$1, matric_number=$2, level=$3, gender=$4, department=$5, center_id=$6 WHERE id=$7 RETURNING id, name, matric_number AS matric, level, gender, department, attendance_code AS code', [name, matric, level, gender, department, centerId, id])
     return result.rowCount ? NextResponse.json(result.rows[0]) : NextResponse.json({ error: 'Member not found.' }, { status: 404 })
   } catch (error: any) {
     if (error.code === '23505') return NextResponse.json({ error: 'That matric number is already registered.' }, { status: 409 })
@@ -53,11 +54,11 @@ export async function POST(request: Request) {
   // Public member self-registration is intentionally available from the login page.
   // Admin-only operations remain protected by requireAdminResponse.
   const body = await request.json()
-  const name = String(body.name ?? '').trim(); const matric = normalizeMatric(body.matric); const level = String(body.level ?? '').trim(); const gender = String(body.gender ?? '').trim(); const department = String(body.department ?? '').trim()
+  const name = String(body.name ?? '').trim(); const matric = normalizeMatric(body.matric); const level = String(body.level ?? '').trim(); const gender = String(body.gender ?? '').trim(); const department = String(body.department ?? '').trim(); const centerId = body.centerId ? Number(body.centerId) : null
   if (!name || !matric || !level || !gender || !department) return NextResponse.json({ error: 'Complete every field.' }, { status: 400 })
   const code = String(Math.floor(1000000 + Math.random() * 9000000))
   try {
-    const result = await pool.query('INSERT INTO members (name, matric_number, level, gender, department, attendance_code) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, name, matric_number AS matric, level, gender, department, attendance_code AS code', [name, matric, level, gender, department, code])
+    const result = await pool.query('INSERT INTO members (name, matric_number, level, gender, department, center_id, attendance_code) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, name, matric_number AS matric, level, gender, department, attendance_code AS code', [name, matric, level, gender, department, centerId, code])
     return NextResponse.json(result.rows[0], { status: 201 })
   } catch (error: any) {
     if (error.code === '23505') return NextResponse.json({ error: 'That matric number is already registered.' }, { status: 409 })
