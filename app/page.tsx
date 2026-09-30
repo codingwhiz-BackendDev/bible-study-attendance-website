@@ -886,12 +886,15 @@ function Workspace({
   const [matric, setMatric] = useState('')
   const [notice, setNotice] = useState('')
   const [noticeTone, setNoticeTone] = useState<NoticeTone>('info')
+  const parsedMeetingId = Number.parseInt(meetingId, 10)
+  const safeMeetingId =
+    Number.isFinite(parsedMeetingId) && parsedMeetingId > 0 ? parsedMeetingId : null
 
   const centerMeetings = meetings.filter((m) =>
     center ? m.centerId === center.id : m.meetingType === 'weekly',
   )
   const attendance = useSWR<Attendance[]>(
-    meetingId ? `/api/attendance?meetingId=${meetingId}` : null,
+    safeMeetingId ? `/api/attendance?meetingId=${safeMeetingId}` : null,
     fetcher,
   )
 
@@ -911,7 +914,7 @@ function Workspace({
 
   async function mark(e: FormEvent) {
     e.preventDefault()
-    if (!meetingId) {
+    if (!safeMeetingId) {
       setNoticeTone('error')
       setNotice('Select a meeting first.')
       return
@@ -927,7 +930,7 @@ function Workspace({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         matric: selected.matric,
-        meetingId,
+        meetingId: safeMeetingId,
         centerId: center?.id || null,
       }),
     })
@@ -1037,8 +1040,11 @@ function Workspace({
           </table>
         )}
 
-        {meetingId && (
-          <a className="secondary-button export-link" href={`/api/attendance/export?meetingId=${meetingId}`}>
+        {safeMeetingId && (
+          <a
+            className="secondary-button export-link"
+            href={`/api/attendance/export?meetingId=${safeMeetingId}`}
+          >
             Export Excel CSV
           </a>
         )}
