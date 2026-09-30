@@ -30,11 +30,12 @@ export async function POST() {
   const lines = (await response.text()).split(/\r?\n/).filter(Boolean)
   const headers = parseCsvLine(lines.shift() ?? '')
   const index = (name: string) => headers.findIndex(header => header.toLowerCase() === name.toLowerCase())
-  const surname = index('Surname'), otherNames = index('Other Names'), department = index('Department'), level = index('Level'), gender = index('Gender'), matric = index('Matric Number')
-  if ([surname, otherNames, department, level, gender, matric].some(value => value < 0)) return NextResponse.json({ error: 'Roster columns are incomplete.' }, { status: 400 })
+  const surname = index('Surname'), otherNames = index('Other Names'), department = index('Department'), level = index('Level'), gender = index('Gender'), matric = index('Matric Number'), worshipCentre = index('Worship Centre')
+  if ([surname, otherNames, department, level, gender, matric, worshipCentre].some(value => value < 0)) return NextResponse.json({ error: 'Roster columns are incomplete.' }, { status: 400 })
 
   const client = await pool.connect()
   let imported = 0
+  const centers = new Set<string>()
   try {
     await client.query('BEGIN')
     for (const line of lines) {
@@ -43,6 +44,11 @@ export async function POST() {
       const matricNumber = normalizeMatric(row[matric])
       if (!name || !matricNumber) continue
       const attendanceCode = `IMPORT-${matricNumber.replace(/[^A-Z0-9]/g, '')}`
+      const centerName = String(row[worshipCentre] ?? '').trim()
+      if (centerName) {
+        centers.add(centerName)
+        await client.query('INSERT INTO centers (name, location) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING', [centerName, 'Imported from roster'])
+      }
       await client.query(`INSERT INTO members (name, matric_number, level, gender, department, attendance_code, role)
         VALUES ($1, $2, $3, $4, $5, $6, 'teacher')
         ON CONFLICT (matric_number) DO UPDATE SET name = EXCLUDED.name, level = EXCLUDED.level, gender = EXCLUDED.gender, department = EXCLUDED.department, role = 'teacher'`,
@@ -50,7 +56,7 @@ export async function POST() {
       imported++
     }
     await client.query('COMMIT')
-    return NextResponse.json({ imported })
+    return NextResponse.json({ imported, centers: centers.size })
   } catch (error) {
     await client.query('ROLLBACK')
     console.error('[v0] roster import failed', error)
