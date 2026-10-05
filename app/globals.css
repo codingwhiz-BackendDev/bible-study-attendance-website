@@ -201,7 +201,7 @@ strong {
 }
 
 .topbar {
-  min-height: 74px;
+  min-height: 82px;
   background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
@@ -216,6 +216,46 @@ strong {
 
 .topbar strong {
   color: var(--ink);
+}
+
+.dashboard-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dashboard-identity img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 50%;
+  background: #fff;
+  padding: 2px;
+  box-shadow: 0 0 0 1px rgba(196, 154, 74, 0.55), 0 7px 16px rgba(12, 40, 29, 0.13);
+  animation: crestFloat 5s ease-in-out infinite;
+}
+
+.dashboard-identity > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.topbar-kicker {
+  color: var(--green-dark);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+@keyframes crestFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-2px) rotate(1deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-identity img { animation: none; }
 }
 
 .topbar-actions {
@@ -358,16 +398,26 @@ strong {
 }
 
 .stat-card,
-.table-card,
-.scan-card,
-.form-card,
-.list-card,
-.notice {
+  .table-card,
+  .scan-card,
+  .form-card,
+  .list-card,
+  .notice {
+  animation: surfaceIn 420ms ease both;
   background: rgba(255, 255, 255, 0.93);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 20px;
   box-shadow: var(--shadow-sm);
+}
+
+@keyframes surfaceIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-card, .table-card, .scan-card, .form-card, .list-card, .notice { animation: none; }
 }
 
 .stat-card {
@@ -785,8 +835,10 @@ tbody tr:hover {
     font-size: 0.85rem;
   }
 
+  .dashboard-identity img { width: 38px; height: 38px; }
+  .topbar-kicker { font-size: 0.58rem; }
   .topbar-actions .user-pill {
-    display: none;
+  display: none;
   }
 
   .content-wrap,
