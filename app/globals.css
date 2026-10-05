@@ -975,3 +975,19 @@ select,
 .calendar-day.is-sunday i {
   color: #7b1f1f;
 }
+
+.calendar-day.is-sunday span {
+  color: #9b1c1c;
+}
+
+.calendar-day.is-sunday:hover,
+.calendar-day.is-sunday:focus-visible {
+  border-color: #9b1c1c;
+  background: #fff0f0;
+}
+
+.calendar-error {
+  color: #7b1f1f;
+  background: #fff4f4;
+  border: 1px solid #edc8c8;
+}
