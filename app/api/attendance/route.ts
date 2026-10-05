@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
 import { requireAdminResponse } from '@/lib/admin-auth'
+import { isSundayIsoDate } from '@/lib/date-only'
 
 export const runtime = 'nodejs'
 
@@ -28,10 +29,10 @@ export async function POST(request: Request) {
   const meetingId = Number(body.meetingId)
   const centerId = Number(body.centerId)
   if (!matric || !meetingId) return NextResponse.json({ error: 'Select a meeting and enter a matric number.' }, { status: 400 })
-  const meeting = await pool.query(`SELECT m.title, m.meeting_type, m.meeting_date, m.center_id, c.name AS center_name FROM meetings m LEFT JOIN centers c ON c.id = m.center_id WHERE m.id = $1`, [meetingId])
+  const meeting = await pool.query(`SELECT m.title, m.meeting_type, to_char(m.meeting_date, 'YYYY-MM-DD') AS meeting_date, m.center_id, c.name AS center_name FROM meetings m LEFT JOIN centers c ON c.id = m.center_id WHERE m.id = $1`, [meetingId])
   if (!meeting.rowCount) return NextResponse.json({ error: 'That meeting was not found.' }, { status: 404 })
   const session = meeting.rows[0]
-  if (session.meeting_type === 'center' && new Date(`${session.meeting_date.toISOString().slice(0, 10)}T12:00:00`).getDay() !== 0) return NextResponse.json({ error: 'Center attendance can only be marked for Sunday sessions.' }, { status: 400 })
+  if (session.meeting_type === 'center' && !isSundayIsoDate(session.meeting_date)) return NextResponse.json({ error: 'Center attendance can only be marked for Sunday sessions.' }, { status: 400 })
   const member = await pool.query(`SELECT name, matric_number AS matric, department, level, center_id AS "centerId", attendance_code AS code
     FROM members
     WHERE UPPER(regexp_replace(matric_number, '\\s+', '', 'g')) = UPPER($1)

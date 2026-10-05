@@ -16,6 +16,7 @@ import {
   Trash2,
   Users,
 } from 'lucide-react'
+import { addDaysToIsoDate, isSundayIsoDate, lagosDateIso } from '@/lib/date-only'
 
 type Member = {
   id: number
@@ -48,7 +49,7 @@ type EmptyCalendarDay = {
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 function nigeriaDate() {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date())
+  return lagosDateIso()
 }
 
 function defaultSundayServiceName(date: string) {
@@ -66,19 +67,6 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat('en-NG', { dateStyle: 'medium', timeZone: 'Africa/Lagos' }).format(
     new Date(Date.UTC(y, m - 1, d, 12)),
   )
-}
-
-function isSundayDate(value: string) {
-  const [y, m, d] = value.slice(0, 10).split('-').map(Number)
-  if (!y || !m || !d) return false
-  return new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay() === 0
-}
-
-function addDaysToIsoDate(value: string, offset: number) {
-  const [y, m, d] = value.slice(0, 10).split('-').map(Number)
-  if (!y || !m || !d) return value
-  const next = new Date(Date.UTC(y, m - 1, d + offset, 12))
-  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-${String(next.getUTCDate()).padStart(2, '0')}`
 }
 
 function PublicRegistration({ onBack }: { onBack: () => void }) {
@@ -932,10 +920,14 @@ function AttendanceCalendar({
   meetings,
   onSelect,
   onCreate,
+  loading,
+  error,
 }: {
   meetings: Meeting[]
   onSelect: (meeting: Meeting) => void
   onCreate: (day: EmptyCalendarDay) => void
+  loading: boolean
+  error: boolean
 }) {
   const [notice, setNotice] = useState('')
   const startDate = nigeriaDate()
@@ -948,7 +940,7 @@ function AttendanceCalendar({
       iso,
       label: new Intl.DateTimeFormat('en-NG', { weekday: 'short', timeZone: 'Africa/Lagos' }).format(dateForLabel),
       day: d,
-      isSunday: isSundayDate(iso),
+      isSunday: isSundayIsoDate(iso),
       items: meetings.filter((m) => m.date.slice(0, 10) === iso),
     }
   })
@@ -969,6 +961,7 @@ function AttendanceCalendar({
             type="button"
             key={day.iso}
             className={`calendar-day ${day.items.length ? 'has-session' : ''} ${day.isSunday ? 'is-sunday' : ''}`}
+            aria-label={`${day.label} ${day.day}${day.isSunday ? ' Sunday' : ''}. ${day.items.length ? `${day.items.length} session${day.items.length > 1 ? 's' : ''} available.` : day.isSunday ? 'Choose center to create Sunday attendance.' : 'Create weekly attendance.'}`}
             onClick={() => {
               if (day.items[0]) {
                 setNotice('')
@@ -981,12 +974,14 @@ function AttendanceCalendar({
           >
             <span>{day.label}</span>
             <strong>{day.day}</strong>
-            <i>{day.items.length ? `${day.items.length} session${day.items.length > 1 ? 's' : ''}` : 'Create'}</i>
+            <i>{day.items.length ? `${day.items.length} session${day.items.length > 1 ? 's' : ''}` : day.isSunday ? 'Choose center' : 'Create weekly'}</i>
           </button>
         ))}
       </div>
+      {loading && <div className="calendar-empty">Loading sessions…</div>}
+      {error && <div className="calendar-empty calendar-error">Unable to load sessions. Refresh and try again.</div>}
       {notice && <div className="calendar-empty">{notice}</div>}
-      {meetings.length === 0 && (
+      {!loading && !error && meetings.length === 0 && (
         <div className="calendar-empty">
           No sessions planned yet. Click a day to start attendance setup for that date.
         </div>
@@ -1120,6 +1115,8 @@ export default function Page() {
                 <p>Choose Centers to open Sunday attendance, or Weekly meetings for other programmes.</p>
                 <AttendanceCalendar
                   meetings={meetingList}
+                  loading={meetings.isLoading}
+                  error={Boolean(meetings.error)}
                   onSelect={(meeting) => {
                     if (meeting.meetingType === 'center' && meeting.centerId) {
                       setPendingSundayDate(meeting.date.slice(0, 10))
