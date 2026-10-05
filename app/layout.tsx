@@ -3,8 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Bible Study Attendance Manager',
-  description: 'A simple and efficient system for managing Bible Study membership and attendance.',
+  title: 'RUC Chapel of Power · Bible Study Attendance',
+  description: "Attendance and member management for Redeemer's University Chapel of Power Bible Study Department in Ede, Nigeria.",
   generator: 'v0.app',
   icons: {
     icon: [
