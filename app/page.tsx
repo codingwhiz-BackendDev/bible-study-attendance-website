@@ -1,36 +1,1218 @@
 'use client'
 
 import useSWR from 'swr'
-import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, BookOpen, CalendarDays, Check, Grid2X2, LayoutDashboard, LogOut, Pencil, Plus, Trash2, Users, Sparkles } from 'lucide-react'
+import { FormEvent, useEffect, useState } from 'react'
+import {
+  ArrowLeft,
+  BookOpen,
+  CalendarDays,
+  Check,
+  Grid2X2,
+  LayoutDashboard,
+  LogOut,
+  Pencil,
+  Plus,
+  Sparkles,
+  Trash2,
+  Users,
+} from 'lucide-react'
 
-type Member = { id:number; name:string; matric:string; level:string; gender:string; department:string; centerId?:number|null; centerName?:string|null }
-type Center = { id:number; name:string; location:string; active:boolean }
-type Meeting = { id:number; title:string; centerId:number|null; date:string; meetingType:'center'|'weekly'; status:string }
-type Attendance = { id:number; name:string; matric:string; dept:string; level:string; markedAt:string }
-const fetcher = (url:string) => fetch(url).then(r=>r.json())
-function nigeriaDate(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Lagos'}).format(new Date())}
-function defaultSundayServiceName(date:string){return `Sunday - ${date}`}
-function normalizeMatric(value:string){const raw=value.trim().toUpperCase().replace(/\s+/g,'');return /^\d+$/.test(raw)?`RUN/CMP/23/${raw}`:raw}
-function formatDate(value:string){const [y,m,d]=value.slice(0,10).split('-').map(Number);if(!y||!m||!d)return 'Date unavailable';return new Intl.DateTimeFormat('en-NG',{dateStyle:'medium',timeZone:'Africa/Lagos'}).format(new Date(Date.UTC(y,m-1,d,12)))}
-function isSundayMorning(){const p=new Intl.DateTimeFormat('en-US',{timeZone:'Africa/Lagos',weekday:'short',hour:'2-digit',hourCycle:'h23'}).formatToParts(new Date());const v=Object.fromEntries(p.map(x=>[x.type,x.value]));return v.weekday==='Sun'&&Number(v.hour)>=6&&Number(v.hour)<12}
+type Member = {
+  id: number
+  name: string
+  matric: string
+  level: string
+  gender: string
+  department: string
+  centerId?: number | null
+  centerName?: string | null
+}
+type Center = { id: number; name: string; location: string; active: boolean }
+type Meeting = {
+  id: number
+  title: string
+  centerId: number | null
+  date: string
+  meetingType: 'center' | 'weekly'
+  status: string
+}
+type Attendance = { id: number; name: string; matric: string; dept: string; level: string; markedAt: string }
 
-function PublicRegistration({onBack}:{onBack:()=>void}){const centers=useSWR<Center[]>('/api/centers',fetcher);const [form,setForm]=useState({name:'',matric:'',level:'',gender:'',department:'',centerId:''});const [notice,setNotice]=useState('');const [saving,setSaving]=useState(false);async function submit(e:FormEvent){e.preventDefault();setSaving(true);setNotice('');const r=await fetch('/api/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...form,matric:normalizeMatric(form.matric)})});const d=await r.json();setSaving(false);if(r.ok){setNotice('Registration successful. You can now give your matric number to the attendance desk.');setForm({name:'',matric:'',level:'',gender:'',department:'',centerId:''})}else setNotice(d.error||'Unable to complete registration.')}return <main className="login-page"><div className="login-card registration-card"><button className="back-link" type="button" onClick={onBack}><ArrowLeft size={16}/> Back to admin login</button><div className="brand-mark"><BookOpen size={22}/></div><p className="eyebrow">MEMBER REGISTRATION</p><h1>Join Bible Study</h1><p>Register yourself without an admin login. Enter your complete matric number, for example RUN/CMP/23/15320. You may also enter only 15320.</p><form onSubmit={submit} className="stack-form"><label>Full name<input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label><label>Matric number<input required inputMode="text" autoCapitalize="characters" placeholder="RUN/CMP/23/15320" value={form.matric} onChange={e=>setForm({...form,matric:e.target.value})}/><small className="field-hint">Format: RUN/CMP/23/number</small></label><label>Center<select required value={form.centerId} onChange={e=>setForm({...form,centerId:e.target.value})}><option value="">Choose your center</option>{(Array.isArray(centers.data)?centers.data:[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>Level<input required placeholder="e.g. 200 level" value={form.level} onChange={e=>setForm({...form,level:e.target.value})}/></label><label>Gender<select required value={form.gender} onChange={e=>setForm({...form,gender:e.target.value})}><option value="">Select gender</option><option>Male</option><option>Female</option></select></label><label>Department<input required value={form.department} onChange={e=>setForm({...form,department:e.target.value})}/></label>{notice&&<div className="notice">{notice}</div>}<button className="primary-button" disabled={saving}>{saving?'Registering…':'Register as a member'}</button></form></div></main>}
+type EmptyCalendarDay = {
+  date: string
+  label: string
+  day: number
+  isSunday: boolean
+}
 
-function PublicAttendance({onBack}:{onBack:()=>void}){const centers=useSWR<Center[]>('/api/centers',fetcher);const meetings=useSWR<Meeting[]>('/api/meetings',fetcher);const [centerId,setCenterId]=useState('');const [meetingId,setMeetingId]=useState('');const [matric,setMatric]=useState('');const [notice,setNotice]=useState('');const sundayMeetings=(Array.isArray(meetings.data)?meetings.data:[]).filter(m=>m.meetingType==='center'&&(!centerId||m.centerId===Number(centerId)));useEffect(()=>{if(meetingId&&!sundayMeetings.some(m=>String(m.id)===meetingId))setMeetingId('')},[meetingId,sundayMeetings]);async function submit(e:FormEvent){e.preventDefault();if(!meetingId)return setNotice('Choose the Sunday service first.');const meeting=sundayMeetings.find(m=>String(m.id)===meetingId);if(!meeting)return setNotice('There is no Sunday service open for this center yet.');const r=await fetch('/api/attendance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matric,meetingId:meeting.id,centerId:Number(centerId)})});const d=await r.json();setNotice(r.ok?'Attendance marked successfully.':d.error||'Unable to mark attendance.');if(r.ok)setMatric('')}return <main className="login-page"><div className="login-card"><button className="back-link" type="button" onClick={onBack}><ArrowLeft size={16}/> Back</button><div className="brand-mark"><Check size={22}/></div><p className="eyebrow">MEMBER ATTENDANCE</p><h1>Mark attendance</h1><p>Choose your registered center, then select the Sunday service and enter your matric number.</p><form onSubmit={submit} className="stack-form"><label>Center<select required value={centerId} onChange={e=>{setCenterId(e.target.value);setMeetingId('')}}><option value="">Choose your center</option>{(Array.isArray(centers.data)?centers.data:[]).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>Sunday service<select required value={meetingId} onChange={e=>setMeetingId(e.target.value)} disabled={!centerId}><option value="">{centerId?'Choose a Sunday service':'Choose center first'}</option>{sundayMeetings.map(m=><option key={m.id} value={m.id}>{m.title} · {formatDate(m.date)}</option>)}</select></label><label>Matric number<input required placeholder="RUN/CMP/23/15320 or 15320" value={matric} onChange={e=>setMatric(e.target.value)}/></label>{notice&&<div className="notice">{notice}</div>}<button className="primary-button">Mark attendance</button></form></div></main>}
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
-function Login({onLogin}:{onLogin:()=>void}){const [password,setPassword]=useState('');const [error,setError]=useState('');const [registering,setRegistering]=useState(false);async function submit(e:FormEvent){e.preventDefault();const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});if(r.ok)onLogin();else setError('Incorrect password.')}if(registering)return <PublicRegistration onBack={()=>setRegistering(false)}/>;return <main className="login-page"><div className="login-card"><div className="institution-lockup"><img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/download-Zo0F1LDoDWJ0KQJcO86OYHZJ7hZoEa.webp" alt="Redeemer's University crest"/><div><strong>RUC</strong><span>Chapel of Power</span></div></div><p className="eyebrow">BIBLE STUDY DEPARTMENT</p><h1>Bible Study Attendance</h1><p>Redeemer&apos;s University, Ede · Chapel of Power Bible Study Department.</p><form onSubmit={submit}><label htmlFor="password">Admin password</label><input id="password" type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Enter password" autoFocus/>{error&&<small className="error">{error}</small>}<button className="primary-button">Sign in</button></form><div className="login-divider"><span>Not an administrator?</span></div><button type="button" className="secondary-button full-width" onClick={()=>setRegistering(true)}>Register as a Bible study member</button></div></main>}
+function nigeriaDate() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date())
+}
 
-function Members({members,mutate}:{members:Member[];mutate:()=>void}){const [open,setOpen]=useState(false);const [query,setQuery]=useState('');const filteredMembers=members.filter(m=>`${m.name} ${m.matric} ${m.department} ${m.centerName||''}`.toLowerCase().includes(query.toLowerCase()));const [form,setForm]=useState({name:'',matric:'',level:'',gender:'',department:''});const [notice,setNotice]=useState('');async function save(e:FormEvent){e.preventDefault();const r=await fetch('/api/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...form,matric:normalizeMatric(form.matric)})});const d=await r.json();setNotice(r.ok?'Member registered successfully.':d.error);if(r.ok){setForm({name:'',matric:'',level:'',gender:'',department:''});setOpen(false);mutate()}}async function edit(m:Member){const name=window.prompt('Full name',m.name);if(name===null)return;const matric=window.prompt('Matric number',m.matric);if(matric===null)return;const level=window.prompt('Level',m.level);if(level===null)return;const r=await fetch('/api/members',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:m.id,name,matric,level,gender:m.gender,department:m.department})});if(r.ok)mutate();else setNotice('Could not update member.')}async function remove(m:Member){if(!window.confirm(`Delete ${m.name}? This will also remove their attendance records.`))return;const r=await fetch(`/api/members?id=${m.id}`,{method:'DELETE'});const d=await r.json();setNotice(r.ok?'Member deleted successfully.':d.error||'Could not delete member.');if(r.ok)mutate()}return <section><div className="section-title"><div><p className="eyebrow">DIRECTORY</p><h1>Members</h1><p>Register members once. Enter only the final digits, for example <strong>15320</strong>; the full number becomes RUN/CMP/23/15320.</p></div><button className="primary-button" onClick={()=>setOpen(!open)}><Plus size={17}/> Add member</button></div>{notice&&<div className="notice">{notice}</div>}<input className="search-input" aria-label="Search members" placeholder="Search by name, matric number, department, or center" value={query} onChange={e=>setQuery(e.target.value)}/>{open&&<form className="form-card" onSubmit={save}><div className="form-grid">{Object.entries({name:'Full name',matric:'Matric number',level:'Level',gender:'Gender',department:'Department'}).map(([k,l])=><label key={k}>{l}<input required placeholder={k==='matric'?'Enter digits only, e.g. 15320':undefined} value={form[k as keyof typeof form]} onChange={e=>setForm({...form,[k]:e.target.value})}/></label>)}</div><button className="primary-button">Save member</button></form>}<div className="table-card"><table><thead><tr><th>Name</th><th>Matric</th><th>Level</th><th>Gender</th><th>Department</th><th>Actions</th></tr></thead><tbody>{filteredMembers.map(m=><tr key={m.id}><td><strong>{m.name}</strong></td><td>{m.matric}</td><td>{m.level}</td><td>{m.gender}</td><td>{m.department}</td><td>{m.centerName||'Not assigned'}</td><td><button className="icon-button" onClick={()=>edit(m)}><Pencil size={15}/> Edit</button><button type="button" className="icon-button danger-button" aria-label={`Delete ${m.name}`} onClick={()=>remove(m)}><Trash2 size={15}/></button></td></tr>)}</tbody></table>{!members.length&&<div className="empty">No members registered yet.</div>}</div></section>}
+function defaultSundayServiceName(date: string) {
+  return `Sunday - ${date}`
+}
 
-function Centers({centers,mutate,onOpen}:{centers:Center[];mutate:()=>void;onOpen:(id:number)=>void}){const [name,setName]=useState('');const [location,setLocation]=useState('');const [editing,setEditing]=useState<number|null>(null);async function save(e:FormEvent){e.preventDefault();const r=await fetch('/api/centers',{method:editing?'PATCH':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(editing?{id:editing,name,location}:{name,location})});if(r.ok){setName('');setLocation('');setEditing(null);mutate()}}return <section><div className="section-title"><div><p className="eyebrow">WORKSPACE SETUP</p><h1>Centers</h1><p>Open a center to create and manage its Sunday attendance.</p></div></div><form className="inline-form" onSubmit={save}><input required placeholder="Center name" value={name} onChange={e=>setName(e.target.value)}/><input placeholder="Location" value={location} onChange={e=>setLocation(e.target.value)}/><button className="primary-button"><Plus size={17}/>{editing?'Save changes':'Add center'}</button>{editing&&<button type="button" className="secondary-button" onClick={()=>{setEditing(null);setName('');setLocation('')}}>Cancel</button>}</form><div className="list-card">{centers.map(c=><div className="list-row clickable" key={c.id} onClick={()=>onOpen(c.id)}><div><strong>{c.name}</strong><span>{c.location||'Location not specified'}</span></div><div className="row-actions"><span className="present-badge"><Check size={12}/> Sunday center</span><button className="icon-button" onClick={e=>{e.stopPropagation();setEditing(c.id);setName(c.name);setLocation(c.location)}}><Pencil size={15}/></button><button className="icon-button danger-button" onClick={async e=>{e.stopPropagation();if(confirm(`Delete ${c.name}?`)){await fetch(`/api/centers?id=${c.id}`,{method:'DELETE'});mutate()}}}>Delete</button></div></div>)}{!centers.length&&<div className="empty">No centers yet. Add your first center above.</div>}</div></section>}
+function normalizeMatric(value: string) {
+  const raw = value.trim().toUpperCase().replace(/\s+/g, '')
+  return /^\d+$/.test(raw) ? `RUN/CMP/23/${raw}` : raw
+}
 
-function MeetingActions({meeting,refresh,onSelect}:{meeting:Meeting;refresh:()=>void;onSelect:()=>void}){const [editing,setEditing]=useState(false);const [title,setTitle]=useState(meeting.title);const [date,setDate]=useState(meeting.date.slice(0,10));async function save(){const r=await fetch('/api/meetings',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:meeting.id,title,date})});if(r.ok){setEditing(false);refresh()}}async function remove(){if(!confirm(`Delete ${meeting.title}? This cannot be undone.`))return;const r=await fetch(`/api/meetings?id=${meeting.id}`,{method:'DELETE'});if(r.ok)refresh()}if(editing)return <div className="meeting-edit"><input value={title} onChange={e=>setTitle(e.target.value)}/><input type="date" value={date} onChange={e=>setDate(e.target.value)}/><button className="primary-button" onClick={save}>Save</button><button className="secondary-button" onClick={()=>setEditing(false)}>Cancel</button></div>;return <div className="list-row clickable" onClick={onSelect}><div><strong>{meeting.title}</strong><span>{formatDate(meeting.date)} · {meeting.meetingType==='weekly'?'Weekly meeting':'Sunday center attendance'}</span></div><div className="row-actions"><span className="present-badge">Ready · Click to mark</span><button className="icon-button" onClick={e=>{e.stopPropagation();setEditing(true)}}><Pencil size={15}/></button><button className="icon-button danger-button" onClick={e=>{e.stopPropagation();remove()}}><Trash2 size={15}/></button></div></div>}
+function formatDate(value: string) {
+  const [y, m, d] = value.slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return 'Date unavailable'
+  return new Intl.DateTimeFormat('en-NG', { dateStyle: 'medium', timeZone: 'Africa/Lagos' }).format(
+    new Date(Date.UTC(y, m - 1, d, 12)),
+  )
+}
 
-function WeeklyMeetings({meetings,refresh,onSelect}:{meetings:Meeting[];refresh:()=>void;onSelect:(id:number)=>void}){const weekly=meetings.filter(m=>m.meetingType==='weekly');const [title,setTitle]=useState('');const [date,setDate]=useState(nigeriaDate());const [notice,setNotice]=useState('');async function create(e:FormEvent){e.preventDefault();const r=await fetch('/api/meetings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,date,meetingType:'weekly'})});const d=await r.json();setNotice(r.ok?'Weekly meeting created.':d.error);if(r.ok){setTitle('');refresh()}}return <section><div className="section-title"><div><p className="eyebrow">WEEKLY PROGRAMMES</p><h1>Weekly meetings</h1><p>Create Tuesday, Saturday, or other meetings without opening a center.</p></div></div><div className="notice">Weekly meetings are independent of centers and can be created on any day.</div><form className="form-card stack-form" onSubmit={create}><label>Meeting name<input required placeholder="e.g. Friday Meeting" value={title} onChange={e=>setTitle(e.target.value)}/></label><label>Date<input required type="date" value={date} onChange={e=>setDate(e.target.value)}/></label><button className="primary-button">Create weekly meeting</button></form>{notice&&<div className="notice">{notice}</div>}<div className="list-card">{weekly.map(m=><MeetingActions key={m.id} meeting={m} refresh={refresh} onSelect={()=>onSelect(m.id)}/>)}{!weekly.length&&<div className="empty">No weekly meetings created yet.</div>}</div></section>}
+function isSundayDate(value: string) {
+  const [y, m, d] = value.slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return false
+  return new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay() === 0
+}
 
-function Workspace({center,members,meetings,refresh,initialMeetingId}:{center?:Center;members:Member[];meetings:Meeting[];refresh:()=>void;initialMeetingId?:number}){const [meetingId,setMeetingId]=useState(initialMeetingId?.toString()||'');const [matric,setMatric]=useState('');const [notice,setNotice]=useState('');const [sundayDate,setSundayDate]=useState(nigeriaDate());const [lastAutoSundayTitle,setLastAutoSundayTitle]=useState(defaultSundayServiceName(nigeriaDate()));const [sundayTitle,setSundayTitle]=useState(lastAutoSundayTitle);const centerMeetings=meetings.filter(m=>center?m.meetingType==='center'&&m.centerId===center.id:m.meetingType==='weekly');const attendance=useSWR<Attendance[]>(meetingId?`/api/attendance?meetingId=${meetingId}`:null,fetcher);const selected=members.find(m=>{const entered=matric.trim().toUpperCase().replace(/\s+/g,'');const stored=m.matric.trim().toUpperCase().replace(/\s+/g,'');return stored===normalizeMatric(entered).toLowerCase().toUpperCase()||stored===entered||stored.replace(/[^0-9]/g,'')===entered.replace(/[^0-9]/g,'')});async function createSundayService(e:FormEvent){e.preventDefault();if(!center)return;const r=await fetch('/api/meetings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:sundayTitle,date:sundayDate,meetingType:'center',centerId:center.id})});const d=await r.json();setNotice(r.ok?'Sunday service created.':d.error);if(r.ok){if(d?.id)setMeetingId(String(d.id));refresh()}}function updateSundayDate(value:string){setSundayDate(value);const nextAutoTitle=defaultSundayServiceName(value);if(!sundayTitle||sundayTitle===lastAutoSundayTitle)setSundayTitle(nextAutoTitle);setLastAutoSundayTitle(nextAutoTitle)}async function mark(e:FormEvent){e.preventDefault();if(!meetingId)return setNotice(center?'Create or select a Sunday service first.':'Select a meeting first.');if(!selected)return setNotice('No registered member has that matric number.');const r=await fetch('/api/attendance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matric:selected.matric,meetingId,centerId:center?.id||null})});const d=await r.json();setNotice(r.ok?`${selected.name} marked present.`:d.error);if(r.ok){setMatric('');attendance.mutate()}}const meeting=meetings.find(m=>String(m.id)===meetingId);return <section><button className="back-link" onClick={refresh}><ArrowLeft size={16}/> Back</button><div className="section-title"><div><p className="eyebrow">{center?'SUNDAY CENTER WORKSPACE':'WEEKLY MEETING WORKSPACE'}</p><h1>{center?.name||'Weekly meeting attendance'}</h1><p>{center?'Create or select a Sunday service, then mark members present.':'Select the meeting, then mark members present.'}</p></div></div>{center&&<form className="form-card stack-form" onSubmit={createSundayService}><label>Sunday service name<input required value={sundayTitle} onChange={e=>setSundayTitle(e.target.value)} placeholder="Sunday - YYYY-MM-DD"/></label><label>Service date<input required type="date" value={sundayDate} onChange={e=>updateSundayDate(e.target.value)}/></label><button className="primary-button"><Plus size={17}/> Create Sunday service</button></form>}<div className="form-card"><label>Attendance session<select value={meetingId} onChange={e=>setMeetingId(e.target.value)}><option value="">{center?'Choose a Sunday service':'Choose a meeting'}</option>{centerMeetings.map(m=><option key={m.id} value={m.id}>{m.title} · {formatDate(m.date)}</option>)}</select></label>{meeting&&<div className="selected-session"><strong>{meeting.title}</strong><span>{formatDate(meeting.date)} · {meeting.status||'Ready'}</span></div>}<form className="inline-form" onSubmit={mark}><input required placeholder="Member matric number" value={matric} onChange={e=>setMatric(e.target.value)}/><button className="primary-button"><Check size={17}/> Mark attendance</button></form>{notice&&<div className="notice">{notice}</div>}</div><div className="table-card"><div className="card-heading"><Users size={18}/><div><h2>Present members</h2><p>{attendance.data?.length||0} marked for this session</p></div></div><table><thead><tr><th>Name</th><th>Matric</th><th>Department</th><th>Level</th></tr></thead><tbody>{(attendance.data||[]).map(a=><tr key={a.id}><td>{a.name}</td><td>{a.matric}</td><td>{a.dept}</td><td>{a.level}</td></tr>)}</tbody></table>{meetingId&&<a className="secondary-button export-link" href={`/api/attendance/export?meetingId=${encodeURIComponent(meetingId)}`}>Export Excel CSV</a>}</div></section>}
+function PublicRegistration({ onBack }: { onBack: () => void }) {
+  const centers = useSWR<Center[]>('/api/centers', fetcher)
+  const [form, setForm] = useState({ name: '', matric: '', level: '', gender: '', department: '', centerId: '' })
+  const [notice, setNotice] = useState('')
+  const [saving, setSaving] = useState(false)
 
-function AttendanceCalendar({meetings,onSelect}:{meetings:Meeting[];onSelect:(id:number)=>void}){const [notice,setNotice]=useState('');const today=new Date();const days=Array.from({length:14},(_,i)=>{const d=new Date(today);d.setDate(today.getDate()+i);const iso=d.toISOString().slice(0,10);return {iso,label:new Intl.DateTimeFormat('en-NG',{weekday:'short'}).format(d),day:d.getDate(),items:meetings.filter(m=>m.date.slice(0,10)===iso)}});return <section className="calendar-panel"><div className="calendar-heading"><div><p className="eyebrow">ATTENDANCE PLANNER</p><h2>Upcoming sessions</h2><p>Keep Sunday services and weekly programmes visible at a glance.</p></div><CalendarDays size={22}/></div><div className="calendar-strip">{days.map(day=><button type="button" key={day.iso} className={`calendar-day ${day.items.length?'has-session':''}`} onClick={()=>day.items[0]?onSelect(day.items[0].id):setNotice(`No session is scheduled for ${day.label} ${day.day} yet.`)}><span>{day.label}</span><strong>{day.day}</strong><i>{day.items.length?`${day.items.length} session${day.items.length>1?'s':''}`:'Open'}</i></button>)}</div>{notice&&<div className="calendar-empty">{notice}</div>}{meetings.length===0&&<div className="calendar-empty">No sessions planned yet. Open a center or create a weekly meeting to start your attendance calendar.</div>}</section>}
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    setNotice('')
+    const r = await fetch('/api/members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, matric: normalizeMatric(form.matric) }),
+    })
+    const d = await r.json()
+    setSaving(false)
+    if (r.ok) {
+      setNotice('Registration successful. You can now give your matric number to the attendance desk.')
+      setForm({ name: '', matric: '', level: '', gender: '', department: '', centerId: '' })
+    } else {
+      setNotice(d.error || 'Unable to complete registration.')
+    }
+  }
 
-export default function Page(){const [auth,setAuth]=useState<boolean|null>(null);const [view,setView]=useState('Dashboard');const [selectedCenter,setSelectedCenter]=useState<number|null>(null);const [selectedMeeting,setSelectedMeeting]=useState<number|undefined>();const members=useSWR<Member[]>('/api/members',fetcher);const centers=useSWR<Center[]>('/api/centers',fetcher);const meetings=useSWR<Meeting[]>('/api/meetings',fetcher);useEffect(()=>{fetch('/api/auth').then(r=>r.json()).then(d=>setAuth(d.authenticated))},[]);if(auth===null)return <div className="loading">Loading…</div>;if(!auth)return <Login onLogin={()=>setAuth(true)}/>;const centerList=Array.isArray(centers.data)?centers.data:[];const memberList=Array.isArray(members.data)?members.data:[];const meetingList=Array.isArray(meetings.data)?meetings.data:[];const refresh=()=>{centers.mutate();meetings.mutate()};const center=centerList.find(c=>c.id===selectedCenter);const go=(v:string)=>{setView(v);setSelectedCenter(null);setSelectedMeeting(undefined)};const items=[['Dashboard',LayoutDashboard],['Members',Users],['Centers',Grid2X2],['Weekly meetings',CalendarDays]] as const;return <div className="app-shell"><aside className="sidebar"><div className="brand"><img className="sidebar-logo" src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/download-Zo0F1LDoDWJ0KQJcO86OYHZJ7hZoEa.webp" alt="Redeemer's University crest"/><div><strong>RUC Chapel of Power</strong><span>Bible Study Department</span></div></div><nav>{items.map(([label,Icon])=><button className={view===label&&!selectedCenter&&!selectedMeeting?'active':''} key={label} onClick={()=>go(label)}><Icon size={17}/>{label}</button>)}</nav><button className="logout" onClick={async()=>{await fetch('/api/auth',{method:'DELETE'});setAuth(false)}}><LogOut size={16}/> Sign out</button></aside><main className="main-content"><header className="topbar"><div className="dashboard-identity"><img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/download-Zo0F1LDoDWJ0KQJcO86OYHZJ7hZoEa.webp" alt="Redeemer's University crest"/><div><span className="topbar-kicker">RUC CHAPEL OF POWER</span><span>Workspace / <strong>{center?.name||view}</strong></span></div></div><div className="topbar-actions"><span className="user-pill">Admin</span><button className="topbar-logout" aria-label="Sign out" onClick={async()=>{await fetch('/api/auth',{method:'DELETE'});setAuth(false)}}><LogOut size={15}/> Sign out</button></div></header><nav className="mobile-nav">{items.map(([label,Icon])=><button key={label} className={view===label?'active':''} onClick={()=>go(label)}><Icon size={16}/>{label}</button>)}</nav>{view==='Dashboard'&&!selectedCenter&&!selectedMeeting&&<section><div className="section-title"><div><p className="eyebrow">OVERVIEW</p><h1>Good morning, Admin</h1><p>Choose Centers to open Sunday attendance, or Weekly meetings for other programmes.</p><AttendanceCalendar meetings={meetingList} onSelect={id=>{setSelectedMeeting(id);setView('Weekly meetings')}}/><div className="dashboard-insight"><div className="insight-icon"><Sparkles size={18}/></div><div><p className="eyebrow">A THOUGHT FOR THE WEEK</p><h3>Gather, grow, and serve together.</h3><p>Every attendance record is a small story of commitment in the RUC community.</p></div></div></div></div><div className="stats-grid"><div className="stat-card"><span>Centers</span><strong>{centerList.length}</strong></div><div className="stat-card"><span>Members</span><strong>{memberList.length}</strong></div><div className="stat-card"><span>Meetings</span><strong>{meetingList.length}</strong></div></div></section>}{view==='Members'&&!selectedCenter&&!selectedMeeting&&<Members members={memberList} mutate={()=>members.mutate()}/>} {view==='Centers'&&!selectedCenter&&!selectedMeeting&&<Centers centers={centerList} mutate={refresh} onOpen={id=>{setSelectedCenter(id);setView('Centers')}}/>}{view==='Weekly meetings'&&!selectedMeeting&&<WeeklyMeetings meetings={meetingList} refresh={refresh} onSelect={id=>setSelectedMeeting(id)}/>} {selectedCenter&&<Workspace center={center} members={memberList} meetings={meetingList} refresh={refresh}/>} {selectedMeeting&&!selectedCenter&&<Workspace members={memberList} meetings={meetingList} refresh={refresh} initialMeetingId={selectedMeeting}/>}</main></div>}
+  return (
+    <main className="login-page">
+      <div className="login-card registration-card">
+        <button className="back-link" type="button" onClick={onBack}>
+          <ArrowLeft size={16} /> Back to admin login
+        </button>
+        <div className="brand-mark">
+          <BookOpen size={22} />
+        </div>
+        <p className="eyebrow">MEMBER REGISTRATION</p>
+        <h1>Join Bible Study</h1>
+        <p>
+          Register yourself without an admin login. Enter your complete matric number, for example RUN/CMP/23/15320.
+          You may also enter only 15320.
+        </p>
+        <form onSubmit={submit} className="stack-form">
+          <label>
+            Full name
+            <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </label>
+          <label>
+            Matric number
+            <input
+              required
+              inputMode="text"
+              autoCapitalize="characters"
+              placeholder="RUN/CMP/23/15320"
+              value={form.matric}
+              onChange={(e) => setForm({ ...form, matric: e.target.value })}
+            />
+            <small className="field-hint">Format: RUN/CMP/23/number</small>
+          </label>
+          <label>
+            Center
+            <select
+              required
+              value={form.centerId}
+              onChange={(e) => setForm({ ...form, centerId: e.target.value })}
+            >
+              <option value="">Choose your center</option>
+              {(Array.isArray(centers.data) ? centers.data : []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Level
+            <input
+              required
+              placeholder="e.g. 200 level"
+              value={form.level}
+              onChange={(e) => setForm({ ...form, level: e.target.value })}
+            />
+          </label>
+          <label>
+            Gender
+            <select required value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
+              <option value="">Select gender</option>
+              <option>Male</option>
+              <option>Female</option>
+            </select>
+          </label>
+          <label>
+            Department
+            <input
+              required
+              value={form.department}
+              onChange={(e) => setForm({ ...form, department: e.target.value })}
+            />
+          </label>
+          {notice && <div className="notice">{notice}</div>}
+          <button className="primary-button" disabled={saving}>
+            {saving ? 'Registering…' : 'Register as a member'}
+          </button>
+        </form>
+      </div>
+    </main>
+  )
+}
+
+function PublicAttendance({ onBack }: { onBack: () => void }) {
+  const centers = useSWR<Center[]>('/api/centers', fetcher)
+  const meetings = useSWR<Meeting[]>('/api/meetings', fetcher)
+  const [centerId, setCenterId] = useState('')
+  const [meetingId, setMeetingId] = useState('')
+  const [matric, setMatric] = useState('')
+  const [notice, setNotice] = useState('')
+
+  const sundayMeetings = (Array.isArray(meetings.data) ? meetings.data : []).filter(
+    (m) => m.meetingType === 'center' && (!centerId || m.centerId === Number(centerId)),
+  )
+
+  useEffect(() => {
+    if (meetingId && !sundayMeetings.some((m) => String(m.id) === meetingId)) setMeetingId('')
+  }, [meetingId, sundayMeetings])
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!meetingId) return setNotice('Choose the Sunday service first.')
+    const meeting = sundayMeetings.find((m) => String(m.id) === meetingId)
+    if (!meeting) return setNotice('There is no Sunday service open for this center yet.')
+    const r = await fetch('/api/attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matric, meetingId: meeting.id, centerId: Number(centerId) }),
+    })
+    const d = await r.json()
+    setNotice(r.ok ? 'Attendance marked successfully.' : d.error || 'Unable to mark attendance.')
+    if (r.ok) setMatric('')
+  }
+
+  return (
+    <main className="login-page">
+      <div className="login-card">
+        <button className="back-link" type="button" onClick={onBack}>
+          <ArrowLeft size={16} /> Back
+        </button>
+        <div className="brand-mark">
+          <Check size={22} />
+        </div>
+        <p className="eyebrow">MEMBER ATTENDANCE</p>
+        <h1>Mark attendance</h1>
+        <p>Choose your registered center, then select the Sunday service and enter your matric number.</p>
+        <form onSubmit={submit} className="stack-form">
+          <label>
+            Center
+            <select
+              required
+              value={centerId}
+              onChange={(e) => {
+                setCenterId(e.target.value)
+                setMeetingId('')
+              }}
+            >
+              <option value="">Choose your center</option>
+              {(Array.isArray(centers.data) ? centers.data : []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Sunday service
+            <select
+              required
+              value={meetingId}
+              onChange={(e) => setMeetingId(e.target.value)}
+              disabled={!centerId}
+            >
+              <option value="">{centerId ? 'Choose a Sunday service' : 'Choose center first'}</option>
+              {sundayMeetings.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.title} · {formatDate(m.date)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Matric number
+            <input
+              required
+              placeholder="RUN/CMP/23/15320 or 15320"
+              value={matric}
+              onChange={(e) => setMatric(e.target.value)}
+            />
+          </label>
+          {notice && <div className="notice">{notice}</div>}
+          <button className="primary-button">Mark attendance</button>
+        </form>
+      </div>
+    </main>
+  )
+}
+
+function Login({ onLogin }: { onLogin: () => void }) {
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [registering, setRegistering] = useState(false)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    const r = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    })
+    if (r.ok) onLogin()
+    else setError('Incorrect password.')
+  }
+
+  if (registering) return <PublicRegistration onBack={() => setRegistering(false)} />
+
+  return (
+    <main className="login-page">
+      <div className="login-card">
+        <div className="institution-lockup">
+          <img
+            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/download-Zo0F1LDoDWJ0KQJcO86OYHZJ7hZoEa.webp"
+            alt="Redeemer's University crest"
+          />
+          <div>
+            <strong>RUC</strong>
+            <span>Chapel of Power</span>
+          </div>
+        </div>
+        <p className="eyebrow">BIBLE STUDY DEPARTMENT</p>
+        <h1>Bible Study Attendance</h1>
+        <p>Redeemer&apos;s University, Ede · Chapel of Power Bible Study Department.</p>
+        <form onSubmit={submit}>
+          <label htmlFor="password">Admin password</label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter password"
+            autoFocus
+          />
+          {error && <small className="error">{error}</small>}
+          <button className="primary-button">Sign in</button>
+        </form>
+        <div className="login-divider">
+          <span>Not an administrator?</span>
+        </div>
+        <button type="button" className="secondary-button full-width" onClick={() => setRegistering(true)}>
+          Register as a Bible study member
+        </button>
+      </div>
+    </main>
+  )
+}
+
+function Members({ members, mutate }: { members: Member[]; mutate: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const filteredMembers = members.filter((m) =>
+    `${m.name} ${m.matric} ${m.department} ${m.centerName || ''}`.toLowerCase().includes(query.toLowerCase()),
+  )
+  const [form, setForm] = useState({ name: '', matric: '', level: '', gender: '', department: '' })
+  const [notice, setNotice] = useState('')
+
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    const r = await fetch('/api/members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, matric: normalizeMatric(form.matric) }),
+    })
+    const d = await r.json()
+    setNotice(r.ok ? 'Member registered successfully.' : d.error)
+    if (r.ok) {
+      setForm({ name: '', matric: '', level: '', gender: '', department: '' })
+      setOpen(false)
+      mutate()
+    }
+  }
+
+  async function edit(m: Member) {
+    const name = window.prompt('Full name', m.name)
+    if (name === null) return
+    const matric = window.prompt('Matric number', m.matric)
+    if (matric === null) return
+    const level = window.prompt('Level', m.level)
+    if (level === null) return
+    const r = await fetch('/api/members', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: m.id, name, matric, level, gender: m.gender, department: m.department }),
+    })
+    if (r.ok) mutate()
+    else setNotice('Could not update member.')
+  }
+
+  async function remove(m: Member) {
+    if (!window.confirm(`Delete ${m.name}? This will also remove their attendance records.`)) return
+    const r = await fetch(`/api/members?id=${m.id}`, { method: 'DELETE' })
+    const d = await r.json()
+    setNotice(r.ok ? 'Member deleted successfully.' : d.error || 'Could not delete member.')
+    if (r.ok) mutate()
+  }
+
+  return (
+    <section>
+      <div className="section-title">
+        <div>
+          <p className="eyebrow">DIRECTORY</p>
+          <h1>Members</h1>
+          <p>
+            Register members once. Enter only the final digits, for example <strong>15320</strong>; the full number
+            becomes RUN/CMP/23/15320.
+          </p>
+        </div>
+        <button className="primary-button" onClick={() => setOpen(!open)}>
+          <Plus size={17} /> Add member
+        </button>
+      </div>
+      {notice && <div className="notice">{notice}</div>}
+      <input
+        className="search-input"
+        aria-label="Search members"
+        placeholder="Search by name, matric number, department, or center"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      {open && (
+        <form className="form-card" onSubmit={save}>
+          <div className="form-grid">
+            {Object.entries({
+              name: 'Full name',
+              matric: 'Matric number',
+              level: 'Level',
+              gender: 'Gender',
+              department: 'Department',
+            }).map(([k, l]) => (
+              <label key={k}>
+                {l}
+                <input
+                  required
+                  placeholder={k === 'matric' ? 'Enter digits only, e.g. 15320' : undefined}
+                  value={form[k as keyof typeof form]}
+                  onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+                />
+              </label>
+            ))}
+          </div>
+          <button className="primary-button">Save member</button>
+        </form>
+      )}
+      <div className="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Matric</th>
+              <th>Level</th>
+              <th>Gender</th>
+              <th>Department</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredMembers.map((m) => (
+              <tr key={m.id}>
+                <td>
+                  <strong>{m.name}</strong>
+                </td>
+                <td>{m.matric}</td>
+                <td>{m.level}</td>
+                <td>{m.gender}</td>
+                <td>{m.department}</td>
+                <td>{m.centerName || 'Not assigned'}</td>
+                <td>
+                  <button className="icon-button" onClick={() => edit(m)}>
+                    <Pencil size={15} /> Edit
+                  </button>
+                  <button type="button" className="icon-button danger-button" aria-label={`Delete ${m.name}`} onClick={() => remove(m)}>
+                    <Trash2 size={15} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!members.length && <div className="empty">No members registered yet.</div>}
+      </div>
+    </section>
+  )
+}
+
+function Centers({
+  centers,
+  mutate,
+  onOpen,
+  pendingSundayDate,
+}: {
+  centers: Center[]
+  mutate: () => void
+  onOpen: (id: number) => void
+  pendingSundayDate?: string
+}) {
+  const [name, setName] = useState('')
+  const [location, setLocation] = useState('')
+  const [editing, setEditing] = useState<number | null>(null)
+
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    const r = await fetch('/api/centers', {
+      method: editing ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editing ? { id: editing, name, location } : { name, location }),
+    })
+    if (r.ok) {
+      setName('')
+      setLocation('')
+      setEditing(null)
+      mutate()
+    }
+  }
+
+  return (
+    <section>
+      <div className="section-title">
+        <div>
+          <p className="eyebrow">WORKSPACE SETUP</p>
+          <h1>Centers</h1>
+          <p>Open a center to create and manage its Sunday attendance.</p>
+        </div>
+      </div>
+      {pendingSundayDate && (
+        <div className="notice">
+          You selected Sunday <strong>{formatDate(pendingSundayDate)}</strong>. Choose a center to create attendance for
+          that day.
+        </div>
+      )}
+      <form className="inline-form" onSubmit={save}>
+        <input required placeholder="Center name" value={name} onChange={(e) => setName(e.target.value)} />
+        <input placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} />
+        <button className="primary-button">
+          <Plus size={17} />
+          {editing ? 'Save changes' : 'Add center'}
+        </button>
+        {editing && (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => {
+              setEditing(null)
+              setName('')
+              setLocation('')
+            }}
+          >
+            Cancel
+          </button>
+        )}
+      </form>
+      <div className="list-card">
+        {centers.map((c) => (
+          <div className="list-row clickable" key={c.id} onClick={() => onOpen(c.id)}>
+            <div>
+              <strong>{c.name}</strong>
+              <span>{c.location || 'Location not specified'}</span>
+            </div>
+            <div className="row-actions">
+              <span className="present-badge">
+                <Check size={12} /> Sunday center
+              </span>
+              <button
+                className="icon-button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setEditing(c.id)
+                  setName(c.name)
+                  setLocation(c.location)
+                }}
+              >
+                <Pencil size={15} />
+              </button>
+              <button
+                className="icon-button danger-button"
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  if (confirm(`Delete ${c.name}?`)) {
+                    await fetch(`/api/centers?id=${c.id}`, { method: 'DELETE' })
+                    mutate()
+                  }
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        ))}
+        {!centers.length && <div className="empty">No centers yet. Add your first center above.</div>}
+      </div>
+    </section>
+  )
+}
+
+function MeetingActions({
+  meeting,
+  refresh,
+  onSelect,
+}: {
+  meeting: Meeting
+  refresh: () => void
+  onSelect: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [title, setTitle] = useState(meeting.title)
+  const [date, setDate] = useState(meeting.date.slice(0, 10))
+
+  async function save() {
+    const r = await fetch('/api/meetings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: meeting.id, title, date }),
+    })
+    if (r.ok) {
+      setEditing(false)
+      refresh()
+    }
+  }
+
+  async function remove() {
+    if (!confirm(`Delete ${meeting.title}? This cannot be undone.`)) return
+    const r = await fetch(`/api/meetings?id=${meeting.id}`, { method: 'DELETE' })
+    if (r.ok) refresh()
+  }
+
+  if (editing) {
+    return (
+      <div className="meeting-edit">
+        <input value={title} onChange={(e) => setTitle(e.target.value)} />
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <button className="primary-button" onClick={save}>
+          Save
+        </button>
+        <button className="secondary-button" onClick={() => setEditing(false)}>
+          Cancel
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="list-row clickable" onClick={onSelect}>
+      <div>
+        <strong>{meeting.title}</strong>
+        <span>{formatDate(meeting.date)} · {meeting.meetingType === 'weekly' ? 'Weekly meeting' : 'Sunday center attendance'}</span>
+      </div>
+      <div className="row-actions">
+        <span className="present-badge">Ready · Click to mark</span>
+        <button
+          className="icon-button"
+          onClick={(e) => {
+            e.stopPropagation()
+            setEditing(true)
+          }}
+        >
+          <Pencil size={15} />
+        </button>
+        <button
+          className="icon-button danger-button"
+          onClick={(e) => {
+            e.stopPropagation()
+            remove()
+          }}
+        >
+          <Trash2 size={15} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function WeeklyMeetings({
+  meetings,
+  refresh,
+  onSelect,
+  initialDate,
+}: {
+  meetings: Meeting[]
+  refresh: () => void
+  onSelect: (id: number) => void
+  initialDate?: string
+}) {
+  const weekly = meetings.filter((m) => m.meetingType === 'weekly')
+  const [title, setTitle] = useState('')
+  const [date, setDate] = useState(initialDate || nigeriaDate())
+  const [notice, setNotice] = useState('')
+
+  useEffect(() => {
+    if (initialDate) setDate(initialDate)
+  }, [initialDate])
+
+  async function create(e: FormEvent) {
+    e.preventDefault()
+    const r = await fetch('/api/meetings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, date, meetingType: 'weekly' }),
+    })
+    const d = await r.json()
+    setNotice(r.ok ? 'Weekly meeting created.' : d.error)
+    if (r.ok) {
+      setTitle('')
+      refresh()
+    }
+  }
+
+  return (
+    <section>
+      <div className="section-title">
+        <div>
+          <p className="eyebrow">WEEKLY PROGRAMMES</p>
+          <h1>Weekly meetings</h1>
+          <p>Create Tuesday, Saturday, or other meetings without opening a center.</p>
+        </div>
+      </div>
+      {initialDate && (
+        <div className="notice">
+          You selected <strong>{formatDate(initialDate)}</strong>. Create a weekly meeting for this date and start marking
+          attendance.
+        </div>
+      )}
+      <div className="notice">Weekly meetings are independent of centers and can be created on any day.</div>
+      <form className="form-card stack-form" onSubmit={create}>
+        <label>
+          Meeting name
+          <input required placeholder="e.g. Friday Meeting" value={title} onChange={(e) => setTitle(e.target.value)} />
+        </label>
+        <label>
+          Date
+          <input required type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </label>
+        <button className="primary-button">Create weekly meeting</button>
+      </form>
+      {notice && <div className="notice">{notice}</div>}
+      <div className="list-card">
+        {weekly.map((m) => (
+          <MeetingActions key={m.id} meeting={m} refresh={refresh} onSelect={() => onSelect(m.id)} />
+        ))}
+        {!weekly.length && <div className="empty">No weekly meetings created yet.</div>}
+      </div>
+    </section>
+  )
+}
+
+function Workspace({
+  center,
+  members,
+  meetings,
+  refresh,
+  initialMeetingId,
+  initialSundayDate,
+}: {
+  center?: Center
+  members: Member[]
+  meetings: Meeting[]
+  refresh: () => void
+  initialMeetingId?: number
+  initialSundayDate?: string
+}) {
+  const [meetingId, setMeetingId] = useState(initialMeetingId?.toString() || '')
+  const [matric, setMatric] = useState('')
+  const [notice, setNotice] = useState('')
+  const [sundayDate, setSundayDate] = useState(initialSundayDate || nigeriaDate())
+  const [lastAutoSundayTitle, setLastAutoSundayTitle] = useState(defaultSundayServiceName(initialSundayDate || nigeriaDate()))
+  const [sundayTitle, setSundayTitle] = useState(lastAutoSundayTitle)
+
+  const centerMeetings = meetings.filter((m) =>
+    center ? m.meetingType === 'center' && m.centerId === center.id : m.meetingType === 'weekly',
+  )
+
+  const attendance = useSWR<Attendance[]>(meetingId ? `/api/attendance?meetingId=${meetingId}` : null, fetcher)
+
+  const selected = members.find((m) => {
+    const entered = matric.trim().toUpperCase().replace(/\s+/g, '')
+    const stored = m.matric.trim().toUpperCase().replace(/\s+/g, '')
+    return (
+      stored === normalizeMatric(entered).toLowerCase().toUpperCase() ||
+      stored === entered ||
+      stored.replace(/[^0-9]/g, '') === entered.replace(/[^0-9]/g, '')
+    )
+  })
+
+  async function createSundayService(e: FormEvent) {
+    e.preventDefault()
+    if (!center) return
+    const r = await fetch('/api/meetings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: sundayTitle, date: sundayDate, meetingType: 'center', centerId: center.id }),
+    })
+    const d = await r.json()
+    setNotice(r.ok ? 'Sunday service created.' : d.error)
+    if (r.ok) {
+      if (d?.id) setMeetingId(String(d.id))
+      refresh()
+    }
+  }
+
+  function updateSundayDate(value: string) {
+    setSundayDate(value)
+    const nextAutoTitle = defaultSundayServiceName(value)
+    if (!sundayTitle || sundayTitle === lastAutoSundayTitle) setSundayTitle(nextAutoTitle)
+    setLastAutoSundayTitle(nextAutoTitle)
+  }
+
+  async function mark(e: FormEvent) {
+    e.preventDefault()
+    if (!meetingId) return setNotice(center ? 'Create or select a Sunday service first.' : 'Select a meeting first.')
+    if (!selected) return setNotice('No registered member has that matric number.')
+    const r = await fetch('/api/attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matric: selected.matric, meetingId, centerId: center?.id || null }),
+    })
+    const d = await r.json()
+    setNotice(r.ok ? `${selected.name} marked present.` : d.error)
+    if (r.ok) {
+      setMatric('')
+      attendance.mutate()
+    }
+  }
+
+  const meeting = meetings.find((m) => String(m.id) === meetingId)
+
+  return (
+    <section>
+      <button className="back-link" onClick={refresh}>
+        <ArrowLeft size={16} /> Back
+      </button>
+      <div className="section-title">
+        <div>
+          <p className="eyebrow">{center ? 'SUNDAY CENTER WORKSPACE' : 'WEEKLY MEETING WORKSPACE'}</p>
+          <h1>{center?.name || 'Weekly meeting attendance'}</h1>
+          <p>
+            {center
+              ? 'Create or select a Sunday service, then mark members present.'
+              : 'Select the meeting, then mark members present.'}
+          </p>
+        </div>
+      </div>
+
+      {center && (
+        <form className="form-card stack-form" onSubmit={createSundayService}>
+          <label>
+            Sunday service name
+            <input
+              required
+              value={sundayTitle}
+              onChange={(e) => setSundayTitle(e.target.value)}
+              placeholder="Sunday - YYYY-MM-DD"
+            />
+          </label>
+          <label>
+            Service date
+            <input required type="date" value={sundayDate} onChange={(e) => updateSundayDate(e.target.value)} />
+          </label>
+          <button className="primary-button">
+            <Plus size={17} /> Create Sunday service
+          </button>
+        </form>
+      )}
+
+      <div className="form-card">
+        <label>
+          Attendance session
+          <select value={meetingId} onChange={(e) => setMeetingId(e.target.value)}>
+            <option value="">{center ? 'Choose a Sunday service' : 'Choose a meeting'}</option>
+            {centerMeetings.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.title} · {formatDate(m.date)}
+              </option>
+            ))}
+          </select>
+        </label>
+        {meeting && (
+          <div className="selected-session">
+            <strong>{meeting.title}</strong>
+            <span>
+              {formatDate(meeting.date)} · {meeting.status || 'Ready'}
+            </span>
+          </div>
+        )}
+
+        <form className="inline-form" onSubmit={mark}>
+          <input
+            required
+            placeholder="Member matric number"
+            value={matric}
+            onChange={(e) => setMatric(e.target.value)}
+          />
+          <button className="primary-button">
+            <Check size={17} /> Mark attendance
+          </button>
+        </form>
+        {notice && <div className="notice">{notice}</div>}
+      </div>
+
+      <div className="table-card">
+        <div className="card-heading">
+          <Users size={18} />
+          <div>
+            <h2>Present members</h2>
+            <p>{attendance.data?.length || 0} marked for this session</p>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Matric</th>
+              <th>Department</th>
+              <th>Level</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(attendance.data || []).map((a) => (
+              <tr key={a.id}>
+                <td>{a.name}</td>
+                <td>{a.matric}</td>
+                <td>{a.dept}</td>
+                <td>{a.level}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {meetingId && (
+          <a className="secondary-button export-link" href={`/api/attendance/export?meetingId=${encodeURIComponent(meetingId)}`}>
+            Export Excel CSV
+          </a>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function AttendanceCalendar({
+  meetings,
+  onSelect,
+  onCreate,
+}: {
+  meetings: Meeting[]
+  onSelect: (meeting: Meeting) => void
+  onCreate: (day: EmptyCalendarDay) => void
+}) {
+  const [notice, setNotice] = useState('')
+  const today = new Date()
+
+  const days = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(today)
+    d.setDate(today.getDate() + i)
+    const iso = d.toISOString().slice(0, 10)
+    return {
+      iso,
+      label: new Intl.DateTimeFormat('en-NG', { weekday: 'short' }).format(d),
+      day: d.getDate(),
+      isSunday: d.getDay() === 0,
+      items: meetings.filter((m) => m.date.slice(0, 10) === iso),
+    }
+  })
+
+  return (
+    <section className="calendar-panel">
+      <div className="calendar-heading">
+        <div>
+          <p className="eyebrow">ATTENDANCE PLANNER</p>
+          <h2>Upcoming sessions</h2>
+          <p>Keep Sunday services and weekly programmes visible at a glance.</p>
+        </div>
+        <CalendarDays size={22} />
+      </div>
+      <div className="calendar-strip">
+        {days.map((day) => (
+          <button
+            type="button"
+            key={day.iso}
+            className={`calendar-day ${day.items.length ? 'has-session' : ''} ${day.isSunday ? 'is-sunday' : ''}`}
+            onClick={() => {
+              if (day.items[0]) {
+                setNotice('')
+                onSelect(day.items[0])
+                return
+              }
+              onCreate({ date: day.iso, label: day.label, day: day.day, isSunday: day.isSunday })
+              setNotice('')
+            }}
+          >
+            <span>{day.label}</span>
+            <strong>{day.day}</strong>
+            <i>{day.items.length ? `${day.items.length} session${day.items.length > 1 ? 's' : ''}` : 'Create'}</i>
+          </button>
+        ))}
+      </div>
+      {notice && <div className="calendar-empty">{notice}</div>}
+      {meetings.length === 0 && (
+        <div className="calendar-empty">
+          No sessions planned yet. Click a day to start attendance setup for that date.
+        </div>
+      )}
+    </section>
+  )
+}
+
+export default function Page() {
+  const [auth, setAuth] = useState<boolean | null>(null)
+  const [view, setView] = useState('Dashboard')
+  const [selectedCenter, setSelectedCenter] = useState<number | null>(null)
+  const [selectedMeeting, setSelectedMeeting] = useState<number | undefined>()
+  const [pendingSundayDate, setPendingSundayDate] = useState<string | undefined>()
+  const [pendingWeeklyDate, setPendingWeeklyDate] = useState<string | undefined>()
+
+  const members = useSWR<Member[]>('/api/members', fetcher)
+  const centers = useSWR<Center[]>('/api/centers', fetcher)
+  const meetings = useSWR<Meeting[]>('/api/meetings', fetcher)
+
+  useEffect(() => {
+    fetch('/api/auth')
+      .then((r) => r.json())
+      .then((d) => setAuth(d.authenticated))
+  }, [])
+
+  if (auth === null) return <div className="loading">Loading…</div>
+  if (!auth) return <Login onLogin={() => setAuth(true)} />
+
+  const centerList = Array.isArray(centers.data) ? centers.data : []
+  const memberList = Array.isArray(members.data) ? members.data : []
+  const meetingList = Array.isArray(meetings.data) ? meetings.data : []
+  const refresh = () => {
+    centers.mutate()
+    meetings.mutate()
+  }
+  const center = centerList.find((c) => c.id === selectedCenter)
+
+  const go = (v: string) => {
+    setView(v)
+    setSelectedCenter(null)
+    setSelectedMeeting(undefined)
+    setPendingSundayDate(undefined)
+    setPendingWeeklyDate(undefined)
+  }
+
+  const items = [
+    ['Dashboard', LayoutDashboard],
+    ['Members', Users],
+    ['Centers', Grid2X2],
+    ['Weekly meetings', CalendarDays],
+  ] as const
+
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <img
+            className="sidebar-logo"
+            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/download-Zo0F1LDoDWJ0KQJcO86OYHZJ7hZoEa.webp"
+            alt="Redeemer's University crest"
+          />
+          <div>
+            <strong>RUC Chapel of Power</strong>
+            <span>Bible Study Department</span>
+          </div>
+        </div>
+        <nav>
+          {items.map(([label, Icon]) => (
+            <button className={view === label && !selectedCenter && !selectedMeeting ? 'active' : ''} key={label} onClick={() => go(label)}>
+              <Icon size={17} />
+              {label}
+            </button>
+          ))}
+        </nav>
+        <button
+          className="logout"
+          onClick={async () => {
+            await fetch('/api/auth', { method: 'DELETE' })
+            setAuth(false)
+          }}
+        >
+          <LogOut size={16} /> Sign out
+        </button>
+      </aside>
+
+      <main className="main-content">
+        <header className="topbar">
+          <div className="dashboard-identity">
+            <img
+              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/download-Zo0F1LDoDWJ0KQJcO86OYHZJ7hZoEa.webp"
+              alt="Redeemer's University crest"
+            />
+            <div>
+              <span className="topbar-kicker">RUC CHAPEL OF POWER</span>
+              <span>
+                Workspace / <strong>{center?.name || view}</strong>
+              </span>
+            </div>
+          </div>
+          <div className="topbar-actions">
+            <span className="user-pill">Admin</span>
+            <button
+              className="topbar-logout"
+              aria-label="Sign out"
+              onClick={async () => {
+                await fetch('/api/auth', { method: 'DELETE' })
+                setAuth(false)
+              }}
+            >
+              <LogOut size={15} /> Sign out
+            </button>
+          </div>
+        </header>
+
+        <nav className="mobile-nav">
+          {items.map(([label, Icon]) => (
+            <button key={label} className={view === label ? 'active' : ''} onClick={() => go(label)}>
+              <Icon size={16} />
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        {view === 'Dashboard' && !selectedCenter && !selectedMeeting && (
+          <section>
+            <div className="section-title">
+              <div>
+                <p className="eyebrow">OVERVIEW</p>
+                <h1>Good morning, Admin</h1>
+                <p>Choose Centers to open Sunday attendance, or Weekly meetings for other programmes.</p>
+                <AttendanceCalendar
+                  meetings={meetingList}
+                  onSelect={(meeting) => {
+                    if (meeting.meetingType === 'center' && meeting.centerId) {
+                      setPendingSundayDate(meeting.date.slice(0, 10))
+                      setPendingWeeklyDate(undefined)
+                      setSelectedMeeting(meeting.id)
+                      setSelectedCenter(meeting.centerId)
+                      setView('Centers')
+                      return
+                    }
+                    setPendingSundayDate(undefined)
+                    setPendingWeeklyDate(meeting.date.slice(0, 10))
+                    setSelectedCenter(null)
+                    setSelectedMeeting(meeting.id)
+                    setView('Weekly meetings')
+                  }}
+                  onCreate={(day) => {
+                    if (day.isSunday) {
+                      setPendingSundayDate(day.date)
+                      setPendingWeeklyDate(undefined)
+                      setSelectedMeeting(undefined)
+                      setSelectedCenter(null)
+                      setView('Centers')
+                      return
+                    }
+                    setPendingSundayDate(undefined)
+                    setPendingWeeklyDate(day.date)
+                    setSelectedCenter(null)
+                    setSelectedMeeting(undefined)
+                    setView('Weekly meetings')
+                  }}
+                />
+                <div className="dashboard-insight">
+                  <div className="insight-icon">
+                    <Sparkles size={18} />
+                  </div>
+                  <div>
+                    <p className="eyebrow">A THOUGHT FOR THE WEEK</p>
+                    <h3>Gather, grow, and serve together.</h3>
+                    <p>Every attendance record is a small story of commitment in the RUC community.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <span>Centers</span>
+                <strong>{centerList.length}</strong>
+              </div>
+              <div className="stat-card">
+                <span>Members</span>
+                <strong>{memberList.length}</strong>
+              </div>
+              <div className="stat-card">
+                <span>Meetings</span>
+                <strong>{meetingList.length}</strong>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {view === 'Members' && !selectedCenter && !selectedMeeting && (
+          <Members members={memberList} mutate={() => members.mutate()} />
+        )}
+
+        {view === 'Centers' && !selectedCenter && !selectedMeeting && (
+          <Centers
+            centers={centerList}
+            mutate={refresh}
+            pendingSundayDate={pendingSundayDate}
+            onOpen={(id) => {
+              setSelectedCenter(id)
+              setView('Centers')
+            }}
+          />
+        )}
+
+        {view === 'Weekly meetings' && !selectedMeeting && (
+          <WeeklyMeetings
+            meetings={meetingList}
+            refresh={refresh}
+            initialDate={pendingWeeklyDate}
+            onSelect={(id) => setSelectedMeeting(id)}
+          />
+        )}
+
+        {selectedCenter && (
+          <Workspace
+            center={center}
+            members={memberList}
+            meetings={meetingList}
+            refresh={refresh}
+            initialMeetingId={selectedMeeting}
+            initialSundayDate={pendingSundayDate}
+          />
+        )}
+
+        {selectedMeeting && !selectedCenter && (
+          <Workspace members={memberList} meetings={meetingList} refresh={refresh} initialMeetingId={selectedMeeting} />
+        )}
+      </main>
+    </div>
+  )
+}

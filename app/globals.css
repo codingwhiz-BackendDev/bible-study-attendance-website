@@ -896,3 +896,82 @@ tbody tr:hover {
     scroll-behavior: auto !important;
   }
 }
+
+/* Classic UI overrides */
+:root {
+  --bg: #f4efe3;
+  --paper: #ffffff;
+  --paper-soft: #f9f7f2;
+  --ink: #1f1a14;
+  --muted: #5e564d;
+  --line: #cfc3b4;
+  --green: #355f46;
+  --green-dark: #254533;
+  --green-soft: #ece6db;
+  --danger: #8b1f1f;
+  --radius: 5px;
+  --shadow-sm: none;
+  --shadow-md: none;
+}
+
+body,
+button,
+input,
+select {
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+h1,
+h2,
+h3,
+strong {
+  letter-spacing: 0;
+}
+
+body,
+.main-content,
+.login-page,
+.topbar,
+.sidebar,
+.calendar-panel,
+.dashboard-insight,
+.primary-button,
+.brand-mark {
+  background-image: none !important;
+}
+
+.sidebar {
+  background: #2f2a25 !important;
+}
+
+.topbar {
+  backdrop-filter: none;
+}
+
+.primary-button,
+.secondary-button,
+.icon-button,
+input,
+select,
+.stat-card,
+.table-card,
+.form-card,
+.list-card,
+.notice,
+.calendar-day,
+.calendar-empty,
+.login-card {
+  border-radius: var(--radius);
+  box-shadow: none;
+}
+
+.calendar-day.is-sunday {
+  border-color: #b84b4b;
+  color: #7b1f1f;
+  background: #fff7f7;
+}
+
+.calendar-day.is-sunday strong,
+.calendar-day.is-sunday i {
+  color: #7b1f1f;
+}
