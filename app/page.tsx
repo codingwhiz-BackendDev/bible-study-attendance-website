@@ -74,6 +74,13 @@ function isSundayDate(value: string) {
   return new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay() === 0
 }
 
+function addDaysToIsoDate(value: string, offset: number) {
+  const [y, m, d] = value.slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return value
+  const next = new Date(Date.UTC(y, m - 1, d + offset, 12))
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-${String(next.getUTCDate()).padStart(2, '0')}`
+}
+
 function PublicRegistration({ onBack }: { onBack: () => void }) {
   const centers = useSWR<Center[]>('/api/centers', fetcher)
   const [form, setForm] = useState({ name: '', matric: '', level: '', gender: '', department: '', centerId: '' })
@@ -931,17 +938,17 @@ function AttendanceCalendar({
   onCreate: (day: EmptyCalendarDay) => void
 }) {
   const [notice, setNotice] = useState('')
-  const today = new Date()
+  const startDate = nigeriaDate()
 
   const days = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date(today)
-    d.setDate(today.getDate() + i)
-    const iso = d.toISOString().slice(0, 10)
+    const iso = addDaysToIsoDate(startDate, i)
+    const [y, m, d] = iso.split('-').map(Number)
+    const dateForLabel = new Date(Date.UTC(y, m - 1, d, 12))
     return {
       iso,
-      label: new Intl.DateTimeFormat('en-NG', { weekday: 'short' }).format(d),
-      day: d.getDate(),
-      isSunday: d.getDay() === 0,
+      label: new Intl.DateTimeFormat('en-NG', { weekday: 'short', timeZone: 'Africa/Lagos' }).format(dateForLabel),
+      day: d,
+      isSunday: isSundayDate(iso),
       items: meetings.filter((m) => m.date.slice(0, 10) === iso),
     }
   })
