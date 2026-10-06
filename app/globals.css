@@ -943,16 +943,37 @@ strong {
   letter-spacing: 0;
 }
 
-body,
-.main-content,
-.login-page,
-.topbar,
-.sidebar,
-.calendar-panel,
-.dashboard-insight,
-.primary-button,
-.brand-mark {
-  background-image: none !important;
+body {
+  background: var(--bg);
+}
+
+.login-page {
+  background: radial-gradient(circle at 12% 5%, rgba(196,154,74,.18), transparent 30%), linear-gradient(145deg, #eef8f2, #fbfdfc 55%, #edf5f0) !important;
+}
+
+.calendar-panel {
+  background: linear-gradient(135deg, rgba(255,255,255,.98), rgba(237,247,241,.92)) !important;
+}
+
+.dashboard-insight {
+  background: linear-gradient(110deg, #0b5e46, #0d8060) !important;
+  min-height: 92px;
+  align-items: center;
+  padding: 22px 24px;
+}
+
+.dashboard-insight h3 { color: #fff; line-height: 1.25; }
+.dashboard-insight p:not(.eyebrow) { color: rgba(255,255,255,.84); line-height: 1.5; }
+
+@media (max-width: 520px) {
+  .dashboard-insight { align-items: flex-start; padding: 18px; gap: 12px; }
+  .dashboard-insight h3 { font-size: 1rem; }
+  .dashboard-insight p:not(.eyebrow) { font-size: .78rem; }
+}
+
+.primary-button {
+  background: var(--green) !important;
+  color: #fff !important;
 }
 
 .sidebar {
@@ -977,16 +998,25 @@ select,
 .calendar-empty,
 .login-card {
   border-radius: var(--radius);
-  box-shadow: none;
+  box-shadow: 0 10px 26px rgba(31, 26, 20, .08);
 }
 
-.calendar-day.is-sunday {
+.login-card {
+  width: min(100% - 28px, 480px);
+  padding: clamp(24px, 5vw, 42px);
+}
+
+.password-field { position: relative; }
+.password-field input { padding-right: 72px; width: 100%; }
+.password-toggle { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; color: var(--green-dark); font-weight: 700; cursor: pointer; padding: 8px; }
+
+.calendar-day.sunday-day {
   border-color: #b84b4b;
   color: #7b1f1f;
   background: #fff7f7;
 }
 
-.calendar-day.is-sunday strong,
-.calendar-day.is-sunday i {
+.calendar-day.sunday-day strong,
+.calendar-day.sunday-day i {
   color: #7b1f1f;
 }
