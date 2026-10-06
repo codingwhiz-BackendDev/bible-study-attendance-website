@@ -11,7 +11,9 @@ function isSundayDate(value: string) {
 }
 
 export async function GET() {
-  const result = await pool.query(`SELECT id, title, center_id AS "centerId", to_char(meeting_date, 'YYYY-MM-DD') AS date, meeting_type AS "meetingType", status FROM meetings ORDER BY meeting_date DESC`)
+  const result = await pool.query(`SELECT id, title, center_id AS "centerId", to_char(meeting_date, 'YYYY-MM-DD') AS date, meeting_type AS "meetingType", status,
+    (meeting_date::date = (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Lagos')::date) AS "isOpenToday"
+    FROM meetings ORDER BY meeting_date DESC`)
   return NextResponse.json(result.rows)
 }
 
