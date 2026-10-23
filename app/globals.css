@@ -806,7 +806,9 @@ tbody tr:hover {
   .login-card { padding: 24px 18px; }
   .login-card > * { max-width: none; }
   .login-card .creator-contact { width: calc(100% + 36px); margin-left: -18px; padding: 24px 18px; border-radius: 0; }
-.calendar-panel{padding:18px;border-radius:16px}.calendar-strip{grid-template-columns:repeat(14,62px)}.calendar-heading h2{font-size:1.15rem}
+  .calendar-panel { width: 100%; padding: 16px; border-radius: 16px; }
+  .calendar-strip { width: 100%; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+  .calendar-heading h2 { font-size: 1.15rem; }
   .sidebar {
     display: none;
   }
@@ -900,13 +902,23 @@ tbody tr:hover {
 
   .row-actions {
     width: 100%;
-    justify-content: flex-end;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
+  .table-card { width: 100%; overflow-x: auto; }
+  .table-card table { min-width: 560px; }
+  .stat-card, .form-card, .list-card, .scan-card, .dashboard-insight, .creator-contact { max-width: 100%; min-width: 0; }
+  .dashboard-insight, .creator-contact { overflow-wrap: anywhere; }
+  .dashboard-insight h3, .creator-contact h2 { font-size: 1rem; }
+  .dashboard-insight p, .creator-contact p { max-width: 100%; }
+  .meeting-edit input, .meeting-edit select, .inline-form input, .inline-form select, .code-entry input { min-width: 0; width: 100%; }
+
   .login-card {
-  padding: 20px;
-  max-height: calc(100vh - 28px);
-  overflow-y: auto;
+    min-height: 100svh;
+    max-height: none;
+    overflow: visible;
+    padding: 24px 16px 0;
   }
 
   .login-card .institution-lockup { margin-bottom: 14px; gap: 10px; }
