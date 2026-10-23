@@ -933,6 +933,28 @@ tbody tr:hover {
   }
 }
 
+/* Responsive landing hardening */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
+.login-page { width: 100%; min-height: 100svh; }
+.login-card { width: 100%; max-width: none; overflow: hidden; }
+.login-card > * { min-width: 0; }
+.login-card .creator-contact { width: 100%; max-width: none; margin-left: 0; margin-right: 0; }
+.creator-contact > div:last-child { min-width: 0; }
+.creator-contact h2, .creator-contact p, .creator-links a { overflow-wrap: anywhere; }
+
+@media (max-width: 520px) {
+  .login-card { min-height: 100svh; justify-content: flex-start; padding: 24px 16px 0; }
+  .login-card > .institution-lockup, .login-card > h1, .login-card > p, .login-card > form, .login-card > .login-divider, .login-card > .secondary-button { width: 100%; }
+  .login-card > h1 { font-size: clamp(1.9rem, 10vw, 2.5rem); line-height: 1.02; }
+  .login-card .creator-contact { width: calc(100% + 32px); margin-left: -16px; margin-top: 30px; padding: 24px 16px 28px; flex-direction: row; align-items: flex-start; }
+  .creator-contact h2 { font-size: 1rem; }
+  .creator-contact p:not(.eyebrow) { font-size: .76rem; }
+  .creator-contact-mark { flex: 0 0 38px; width: 38px; height: 38px; }
+  .creator-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .creator-links a { justify-content: center; text-align: center; min-width: 0; }
+}
+
 /* Classic UI overrides */
 :root {
   --bg: #f4efe3;
@@ -1028,15 +1050,17 @@ select,
 .list-card,
 .notice,
 .calendar-day,
-.calendar-empty,
-.login-card {
+.calendar-empty {
   border-radius: var(--radius);
   box-shadow: 0 10px 26px rgba(31, 26, 20, .08);
 }
 
 .login-card {
-  width: min(100% - 28px, 480px);
-  padding: clamp(24px, 5vw, 42px);
+  width: 100%;
+  min-height: 100svh;
+  padding: clamp(28px, 6vw, 72px) clamp(20px, 8vw, 120px);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .password-field { position: relative; }
